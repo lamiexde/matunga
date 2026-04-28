@@ -479,6 +479,8 @@ function render() {
 
 function initVisualEffects() {
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const root = document.body;
+  const title = document.querySelector("h1.h2");
 
   const revealItems = document.querySelectorAll(".reveal");
   if (!reduceMotion && "IntersectionObserver" in window) {
@@ -505,6 +507,10 @@ function initVisualEffects() {
   let raf = 0;
 
   function updateParallax(mx, my, sy) {
+    root.style.setProperty("--mx", mx.toFixed(4));
+    root.style.setProperty("--my", my.toFixed(4));
+    root.style.setProperty("--scroll", Math.min(1, sy / 800).toFixed(4));
+
     parallaxEls.forEach((el) => {
       const depth = Number(el.getAttribute("data-depth") || "0");
       const tx = mx * depth * 18;
@@ -513,6 +519,9 @@ function initVisualEffects() {
     });
     if (auroraEl) {
       auroraEl.style.transform = `translate3d(${(mx * -8).toFixed(2)}px, ${(my * -6 - sy * 0.03).toFixed(2)}px, 0)`;
+    }
+    if (title) {
+      title.style.filter = `brightness(${(1 + Math.abs(mx) * 0.24 + Math.abs(my) * 0.2).toFixed(3)})`;
     }
   }
 
@@ -541,87 +550,250 @@ function initVisualEffects() {
 }
 
 function initParticles() {
-  const canvas = document.getElementById("fx-particles");
-  if (!(canvas instanceof HTMLCanvasElement)) return;
+  const nebulaCanvas = document.getElementById("fx-nebula");
+  const particleCanvas = document.getElementById("fx-particles");
+  if (!(nebulaCanvas instanceof HTMLCanvasElement) || !(particleCanvas instanceof HTMLCanvasElement)) return;
 
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
+  const nctx = nebulaCanvas.getContext("2d");
+  const pctx = particleCanvas.getContext("2d");
+  if (!nctx || !pctx) return;
 
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const DPR = Math.min(window.devicePixelRatio || 1, 2);
+  const DPR = Math.min(window.devicePixelRatio || 1, 1.6);
   let width = 0;
   let height = 0;
   let particles = [];
+  let mouse = { x: 0, y: 0, active: false, push: false };
+  let caGrid = [];
+  let caW = 0;
+  let caH = 0;
+  let frame = 0;
+
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const fade = (t) => t * t * (3 - 2 * t);
+  const fract = (v) => v - Math.floor(v);
+  const hash2 = (x, y) => fract(Math.sin(x * 127.1 + y * 311.7) * 43758.5453123);
+
+  function valueNoise(x, y) {
+    const xi = Math.floor(x);
+    const yi = Math.floor(y);
+    const xf = x - xi;
+    const yf = y - yi;
+
+    const n00 = hash2(xi, yi);
+    const n10 = hash2(xi + 1, yi);
+    const n01 = hash2(xi, yi + 1);
+    const n11 = hash2(xi + 1, yi + 1);
+
+    const u = fade(xf);
+    const v = fade(yf);
+    return lerp(lerp(n00, n10, u), lerp(n01, n11, u), v);
+  }
+
+  function fbm(x, y, octaves = 4) {
+    let value = 0;
+    let amp = 0.55;
+    let freq = 1;
+    let norm = 0;
+    for (let i = 0; i < octaves; i++) {
+      value += valueNoise(x * freq, y * freq) * amp;
+      norm += amp;
+      amp *= 0.5;
+      freq *= 2.02;
+    }
+    return value / norm;
+  }
+
+  function fourier(t, phase) {
+    return (
+      Math.sin(t + phase) * 1 +
+      Math.sin(2 * t - phase * 0.7) * 0.52 +
+      Math.sin(3.6 * t + phase * 1.2) * 0.24
+    );
+  }
 
   function createParticle() {
-    const green = Math.random() < 0.58;
-    const baseHue = green ? 154 : 2;
     return {
       x: Math.random() * width,
       y: Math.random() * height,
-      vx: (Math.random() - 0.5) * (green ? 0.18 : 0.14),
-      vy: (Math.random() - 0.5) * (green ? 0.16 : 0.12),
-      radius: Math.random() * 1.8 + 0.6,
-      alpha: Math.random() * 0.28 + 0.08,
-      hue: baseHue + (Math.random() * 14 - 7),
+      age: Math.random() * 1000,
+      speed: 0.34 + Math.random() * 0.45,
+      hue: Math.random() < 0.55 ? 154 : 3,
+      alpha: 0.08 + Math.random() * 0.16,
     };
+  }
+
+  function createCA() {
+    caW = Math.max(36, Math.floor(width / 22));
+    caH = Math.max(26, Math.floor(height / 22));
+    caGrid = Array.from({ length: caW * caH }, () => (Math.random() < 0.17 ? 1 : 0));
   }
 
   function resize() {
     width = window.innerWidth;
     height = window.innerHeight;
-    canvas.width = Math.floor(width * DPR);
-    canvas.height = Math.floor(height * DPR);
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
-    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    [nebulaCanvas, particleCanvas].forEach((canvas) => {
+      canvas.width = Math.floor(width * DPR);
+      canvas.height = Math.floor(height * DPR);
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+    });
+    nctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    pctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 
-    const count = Math.max(44, Math.min(110, Math.floor((width * height) / 22000)));
+    const count = Math.max(180, Math.min(460, Math.floor((width * height) / 4200)));
     particles = Array.from({ length: count }, createParticle);
+    createCA();
+    nctx.clearRect(0, 0, width, height);
+    pctx.clearRect(0, 0, width, height);
+  }
+
+  function fieldAt(x, y, time, scrollN) {
+    const nx = x * 0.0033;
+    const ny = y * 0.0033;
+    const noise = fbm(nx + time * 0.05, ny - time * 0.04, 4);
+    const wave = fourier(nx * 1.9 + ny * 1.2, time * 1.3 + scrollN * 6);
+    const angle = noise * Math.PI * 4 + wave * 0.55;
+    return { angle, force: 0.7 + noise * 0.8 };
+  }
+
+  function updateCA() {
+    if (frame % 6 !== 0 || caGrid.length === 0) return;
+    const next = new Array(caGrid.length).fill(0);
+    for (let y = 0; y < caH; y++) {
+      for (let x = 0; x < caW; x++) {
+        let neighbors = 0;
+        for (let oy = -1; oy <= 1; oy++) {
+          for (let ox = -1; ox <= 1; ox++) {
+            if (ox === 0 && oy === 0) continue;
+            const nx = (x + ox + caW) % caW;
+            const ny = (y + oy + caH) % caH;
+            neighbors += caGrid[ny * caW + nx];
+          }
+        }
+        const idx = y * caW + x;
+        const alive = caGrid[idx] === 1;
+        next[idx] = alive ? (neighbors === 2 || neighbors === 3 ? 1 : 0) : neighbors === 3 ? 1 : 0;
+      }
+    }
+    caGrid = next;
+  }
+
+  function drawNebula(time, scrollN) {
+    const step = 9;
+    nctx.clearRect(0, 0, width, height);
+
+    for (let y = 0; y < height; y += step) {
+      for (let x = 0; x < width; x += step) {
+        const nx = x / width;
+        const ny = y / height;
+        const n = fbm(nx * 3.4 + time * 0.06, ny * 3.1 - time * 0.05, 5);
+        const w = fourier((nx - ny) * 5.4, time * 1.8 + scrollN * 5.2) * 0.12;
+        const v = Math.max(0, Math.min(1, n + w));
+        if (v < 0.44) continue;
+        const hue = v > 0.63 ? 154 : 5;
+        const alpha = (v - 0.42) * 0.11;
+        nctx.fillStyle = `hsla(${hue}, 52%, ${hue === 154 ? 33 : 36}%, ${alpha.toFixed(3)})`;
+        nctx.fillRect(x, y, step, step);
+      }
+    }
+
+    const cellSizeX = width / caW;
+    const cellSizeY = height / caH;
+    nctx.fillStyle = "rgba(160, 192, 171, 0.04)";
+    for (let y = 0; y < caH; y++) {
+      for (let x = 0; x < caW; x++) {
+        if (!caGrid[y * caW + x]) continue;
+        nctx.fillRect(x * cellSizeX, y * cellSizeY, Math.max(1, cellSizeX * 0.7), Math.max(1, cellSizeY * 0.7));
+      }
+    }
   }
 
   function step() {
-    ctx.fillStyle = "rgba(20, 18, 18, 0.2)";
-    ctx.fillRect(0, 0, width, height);
+    frame++;
+    const time = performance.now() * 0.00026;
+    const scrollN = Math.min(1.2, window.scrollY / Math.max(500, document.body.scrollHeight - window.innerHeight));
 
-    for (const p of particles) {
-      p.x += p.vx;
-      p.y += p.vy;
-
-      if (p.x < -20) p.x = width + 20;
-      if (p.x > width + 20) p.x = -20;
-      if (p.y < -20) p.y = height + 20;
-      if (p.y > height + 20) p.y = -20;
-
-      const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.radius * 8);
-      grad.addColorStop(0, `hsla(${p.hue}, 56%, 62%, ${p.alpha})`);
-      grad.addColorStop(1, `hsla(${p.hue}, 90%, 68%, 0)`);
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.radius * 8, 0, Math.PI * 2);
-      ctx.fill();
+    if (frame % 2 === 0) {
+      updateCA();
+      drawNebula(time, scrollN);
     }
 
-    for (let i = 0; i < particles.length; i++) {
-      for (let j = i + 1; j < particles.length; j++) {
+    pctx.fillStyle = "rgba(14, 14, 14, 0.11)";
+    pctx.fillRect(0, 0, width, height);
+
+    const pointerInfluence = mouse.active ? 1 : 0;
+    for (const p of particles) {
+      p.age += 0.0034;
+      const f = fieldAt(p.x, p.y, time + p.age, scrollN);
+      let vx = Math.cos(f.angle) * p.speed * f.force;
+      let vy = Math.sin(f.angle) * p.speed * f.force;
+
+      if (pointerInfluence) {
+        const dx = mouse.x - p.x;
+        const dy = mouse.y - p.y;
+        const dist = Math.hypot(dx, dy) + 0.0001;
+        const power = Math.max(0, 1 - dist / 260);
+        const pull = (mouse.push ? -1 : 1) * power * 1.35;
+        vx += (dx / dist) * pull;
+        vy += (dy / dist) * pull;
+      }
+
+      p.x += vx;
+      p.y += vy;
+
+      if (p.x < -8) p.x = width + 8;
+      if (p.x > width + 8) p.x = -8;
+      if (p.y < -8) p.y = height + 8;
+      if (p.y > height + 8) p.y = -8;
+
+      const grad = pctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 6 + p.speed * 4);
+      grad.addColorStop(0, `hsla(${p.hue}, 58%, 68%, ${p.alpha.toFixed(3)})`);
+      grad.addColorStop(1, `hsla(${p.hue}, 58%, 68%, 0)`);
+      pctx.fillStyle = grad;
+      pctx.beginPath();
+      pctx.arc(p.x, p.y, 5 + p.speed * 3.2, 0, Math.PI * 2);
+      pctx.fill();
+    }
+
+    for (let i = 0; i < particles.length; i += 2) {
+      for (let j = i + 1; j < particles.length; j += 3) {
         const a = particles[i];
         const b = particles[j];
         const dx = a.x - b.x;
         const dy = a.y - b.y;
         const dist = Math.hypot(dx, dy);
-        if (dist > 110) continue;
-        const opacity = (1 - dist / 110) * 0.06;
-        ctx.strokeStyle = `rgba(173, 188, 176, ${opacity})`;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(a.x, a.y);
-        ctx.lineTo(b.x, b.y);
-        ctx.stroke();
+        if (dist > 62) continue;
+        const opacity = (1 - dist / 62) * 0.09;
+        pctx.strokeStyle = `rgba(145, 171, 157, ${opacity.toFixed(3)})`;
+        pctx.lineWidth = 0.8;
+        pctx.beginPath();
+        pctx.moveTo(a.x, a.y);
+        pctx.lineTo(b.x, b.y);
+        pctx.stroke();
       }
     }
 
     if (!reduceMotion) requestAnimationFrame(step);
   }
+
+  window.addEventListener("mousemove", (event) => {
+    mouse.x = event.clientX;
+    mouse.y = event.clientY;
+    mouse.active = true;
+  });
+
+  window.addEventListener("mouseleave", () => {
+    mouse.active = false;
+  });
+
+  window.addEventListener("mousedown", () => {
+    mouse.push = true;
+  });
+
+  window.addEventListener("mouseup", () => {
+    mouse.push = false;
+  });
 
   resize();
   step();
