@@ -28,16 +28,14 @@ const MODE_DEPTH = {
 
 const boardEl = document.getElementById("board");
 const statusEl = document.getElementById("status");
-const historyEl = document.getElementById("history");
+const historyWrapEl = document.getElementById("history");
 const modeEl = document.getElementById("mode");
 const newGameBtn = document.getElementById("new-game");
 const undoBtn = document.getElementById("undo");
-const titleEl = document.getElementById("brand-title");
-const stageEl = document.getElementById("stage");
-const body = document.body;
+const bgCanvas = document.getElementById("bg");
 
-if (!boardEl || !statusEl || !historyEl || !modeEl || !newGameBtn || !undoBtn || !titleEl || !stageEl) {
-  throw new Error("Estrutura de interface incompleta.");
+if (!boardEl || !statusEl || !historyWrapEl || !modeEl || !newGameBtn || !undoBtn || !(bgCanvas instanceof HTMLCanvasElement)) {
+  throw new Error("Elementos obrigatórios da interface não encontrados.");
 }
 
 const state = {
@@ -54,22 +52,20 @@ const state = {
   snapshotBeforeMove: null,
   botTimer: null,
   info: "",
-  hoverCell: null,
+  lastMove: null,
+  lastMoveAt: 0,
 };
 
-const fxState = {
-  mouseX: 0.5,
-  mouseY: 0.5,
-  mouseWorldX: 0,
-  mouseWorldY: 0,
-  mouseDown: false,
-  boardEnergy: 0,
-  movePulse: 0,
+const bgState = {
+  mouseX: 0,
+  mouseY: 0,
+  targetOffsetX: 0,
+  targetOffsetY: 0,
+  offsetX: 0,
+  offsetY: 0,
   scrollTarget: 0,
-  scrollCurrent: 0,
+  scrollValue: 0,
 };
-
-let cellRefs = [];
 
 function other(player) {
   return player === U ? H : U;
@@ -325,7 +321,7 @@ function scheduleBotTurn() {
       return;
     }
     executeMove(move, true);
-  }, state.mode === "bvb" ? 420 : 300);
+  }, state.mode === "bvb" ? 420 : 280);
 }
 
 function saveSnapshot() {
@@ -343,6 +339,8 @@ function saveSnapshot() {
     winner: state.winner,
     winningCells: state.winningCells.map(([r, c]) => [r, c]),
     info: state.info,
+    lastMove: state.lastMove ? { from: [...state.lastMove.from], to: [...state.lastMove.to] } : null,
+    lastMoveAt: state.lastMoveAt,
   };
 }
 
@@ -360,6 +358,8 @@ function restoreSnapshot(snapshot) {
   state.winner = snapshot.winner;
   state.winningCells = snapshot.winningCells.map(([r, c]) => [r, c]);
   state.info = snapshot.info;
+  state.lastMove = snapshot.lastMove ? { from: [...snapshot.lastMove.from], to: [...snapshot.lastMove.to] } : null;
+  state.lastMoveAt = snapshot.lastMoveAt;
 }
 
 function applyPassLogic() {
@@ -387,7 +387,8 @@ function executeMove(move, fromBot = false) {
   state.selected = null;
   state.validTargets = [];
   state.info = fromBot ? "Jogada do bot concluída." : "";
-  fxState.movePulse = 1.0;
+  state.lastMove = { from: [...move.from], to: [...move.to] };
+  state.lastMoveAt = performance.now();
 
   const result = checkWin(state.board, state.turn);
   if (result.won) {
@@ -425,74 +426,51 @@ function onCellClick(r, c) {
     state.validTargets = [];
     state.info = "";
   }
+
   renderBoard();
   renderStatus();
 }
 
-function applyCellForceField() {
-  if (!cellRefs.length) return;
-  const [hr, hc] = state.hoverCell || [-999, -999];
-  const energy = fxState.boardEnergy;
-
-  for (let r = 0; r < SIZE; r++) {
-    for (let c = 0; c < SIZE; c++) {
-      const el = cellRefs[r][c];
-      if (!el) continue;
-      const dx = c - hc;
-      const dy = r - hr;
-      const dist = Math.hypot(dx, dy);
-      const baseForce = state.hoverCell ? Math.max(0, 1 - dist / 2.8) : 0;
-      const force = baseForce * (0.55 + energy * 0.45);
-      const fx = dist < 0.001 ? 0 : dx / (dist + 0.001);
-      const fy = dist < 0.001 ? 0 : dy / (dist + 0.001);
-      el.style.setProperty("--force", force.toFixed(3));
-      el.style.setProperty("--fx", (fx * force).toFixed(3));
-      el.style.setProperty("--fy", (fy * force).toFixed(3));
-    }
-  }
-}
-
 function renderBoard() {
   boardEl.innerHTML = "";
-  cellRefs = Array.from({ length: SIZE }, () => Array(SIZE).fill(null));
   const validSet = new Set(state.validTargets.map(([r, c]) => `${r},${c}`));
   const winSet = new Set(state.winningCells.map(([r, c]) => `${r},${c}`));
+  const moving = state.lastMove && performance.now() - state.lastMoveAt < 190 ? state.lastMove : null;
 
   for (let r = 0; r < SIZE; r++) {
     for (let c = 0; c < SIZE; c++) {
       const button = document.createElement("button");
       button.type = "button";
-      button.className = "slot";
-      button.dataset.r = String(r);
-      button.dataset.c = String(c);
+      button.className = "cell";
       const piece = state.board[r][c];
 
-      if (piece === U) button.classList.add("unicorn");
-      if (piece === H) button.classList.add("horse");
+      if (piece === U) button.classList.add("piece-a");
+      if (piece === H) button.classList.add("piece-b");
       if (state.selected && state.selected[0] === r && state.selected[1] === c) button.classList.add("selected");
       if (validSet.has(`${r},${c}`)) button.classList.add("valid");
-      if (winSet.has(`${r},${c}`)) button.classList.add("winning");
+      if (winSet.has(`${r},${c}`)) {
+        button.classList.add("win");
+        button.style.setProperty("--win-color", state.winner === U ? "#d59b45" : "#69d49a");
+      }
+      if (moving) {
+        if (moving.from[0] === r && moving.from[1] === c) button.classList.add("move-from");
+        if (moving.to[0] === r && moving.to[1] === c) button.classList.add("move-to");
+      }
+
       button.textContent = piece === U ? "🦄" : piece === H ? "🐴" : "";
       button.addEventListener("click", () => onCellClick(r, c));
-      button.addEventListener("mouseenter", () => {
-        state.hoverCell = [r, c];
-        fxState.boardEnergy = Math.min(1, fxState.boardEnergy + 0.35);
-        applyCellForceField();
-      });
 
       const coord = document.createElement("span");
-      coord.className = "rc";
+      coord.className = "coord";
       coord.textContent = `${r},${c}`;
       button.appendChild(coord);
       boardEl.appendChild(button);
-      cellRefs[r][c] = button;
     }
   }
-  applyCellForceField();
 }
 
 function renderHistory() {
-  historyEl.innerHTML = "";
+  const ol = document.createElement("ol");
   state.history.forEach((item, i) => {
     const li = document.createElement("li");
     if (item.type === "move") {
@@ -500,24 +478,27 @@ function renderHistory() {
     } else {
       li.innerHTML = `<strong>${i + 1}.</strong> ${pieceLabel(item.player)} sem jogadas (passa a vez)`;
     }
-    historyEl.appendChild(li);
+    if (i === state.history.length - 1) li.classList.add("latest");
+    ol.appendChild(li);
   });
+  historyWrapEl.innerHTML = "";
+  historyWrapEl.appendChild(ol);
 }
 
 function renderStatus() {
   if (state.gameOver) {
     if (state.winner) {
-      const cls = state.winner === U ? "u" : "h";
+      const cls = state.winner === U ? "a" : "b";
       statusEl.innerHTML = `<strong><span class="${cls}">${pieceLabel(state.winner)}</span> venceu!</strong>`;
-      return;
+    } else {
+      statusEl.innerHTML = `<strong>Empate.</strong> <span class="warn">Nenhum jogador possui movimentos.</span>`;
     }
-    statusEl.innerHTML = `<strong>Empate.</strong> <span class="warn">Nenhum jogador possui movimentos.</span>`;
     return;
   }
-  const cls = state.turn === U ? "u" : "h";
+
+  const cls = state.turn === U ? "a" : "b";
   const bot = isBotTurn() ? " (pensando...)" : "";
-  const infoClass = state.info.includes("travado") ? "warn" : "ok";
-  const info = state.info ? ` <span class="${infoClass}">${state.info}</span>` : "";
+  const info = state.info ? `<br>${state.info}` : "";
   statusEl.innerHTML = `Vez: <strong><span class="${cls}">${pieceLabel(state.turn)}</span>${bot}</strong>${info}`;
 }
 
@@ -526,291 +507,6 @@ function render() {
   renderBoard();
   renderHistory();
   renderStatus();
-}
-
-function initUIPhysics() {
-  boardEl.addEventListener("mouseleave", () => {
-    state.hoverCell = null;
-  });
-
-  window.addEventListener("mousemove", (event) => {
-    const nx = event.clientX / window.innerWidth - 0.5;
-    const ny = event.clientY / window.innerHeight - 0.5;
-    fxState.mouseX = nx;
-    fxState.mouseY = ny;
-    fxState.mouseWorldX = event.clientX;
-    fxState.mouseWorldY = event.clientY;
-  });
-
-  window.addEventListener("scroll", () => {
-    const max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
-    fxState.scrollTarget = Math.min(1, window.scrollY / max);
-  }, { passive: true });
-
-  window.addEventListener("mousedown", () => { fxState.mouseDown = true; });
-  window.addEventListener("mouseup", () => { fxState.mouseDown = false; });
-}
-
-function startVisualLoop() {
-  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  if (reduceMotion) return;
-
-  let tilt = 0;
-  function frame() {
-    fxState.scrollCurrent += (fxState.scrollTarget - fxState.scrollCurrent) * 0.06;
-    fxState.boardEnergy *= 0.92;
-    fxState.movePulse *= 0.94;
-    tilt += (fxState.mouseX * 0.9 - tilt) * 0.08;
-
-    body.style.setProperty("--mx", fxState.mouseX.toFixed(4));
-    body.style.setProperty("--my", fxState.mouseY.toFixed(4));
-    body.style.setProperty("--tilt", tilt.toFixed(4));
-    body.style.setProperty("--scroll-energy", fxState.scrollCurrent.toFixed(4));
-    body.style.setProperty("--pulse", fxState.movePulse.toFixed(4));
-
-    if (state.hoverCell) applyCellForceField();
-    requestAnimationFrame(frame);
-  }
-  requestAnimationFrame(frame);
-}
-
-function startBackgroundSystem() {
-  const canvas = document.getElementById("bg-system");
-  if (!(canvas instanceof HTMLCanvasElement)) return;
-  const ctx = canvas.getContext("2d", { alpha: true });
-  if (!ctx) return;
-
-  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  let w = 0;
-  let h = 0;
-  let dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-  let particles = [];
-  let automata = [];
-  let cellCols = 0;
-  let cellRows = 0;
-  let frameCount = 0;
-
-  const fract = (v) => v - Math.floor(v);
-  const lerp = (a, b, t) => a + (b - a) * t;
-  const fade = (t) => t * t * (3 - 2 * t);
-  const hash2 = (x, y) => fract(Math.sin(x * 127.1 + y * 311.7) * 43758.5453123);
-
-  function valueNoise(x, y) {
-    const xi = Math.floor(x);
-    const yi = Math.floor(y);
-    const xf = x - xi;
-    const yf = y - yi;
-    const n00 = hash2(xi, yi);
-    const n10 = hash2(xi + 1, yi);
-    const n01 = hash2(xi, yi + 1);
-    const n11 = hash2(xi + 1, yi + 1);
-    const u = fade(xf);
-    const v = fade(yf);
-    return lerp(lerp(n00, n10, u), lerp(n01, n11, u), v);
-  }
-
-  function fbm(x, y, oct = 5) {
-    let total = 0;
-    let amp = 0.5;
-    let freq = 1.0;
-    let sumAmp = 0;
-    for (let i = 0; i < oct; i++) {
-      total += valueNoise(x * freq, y * freq) * amp;
-      sumAmp += amp;
-      amp *= 0.5;
-      freq *= 2.02;
-    }
-    return total / sumAmp;
-  }
-
-  function fourierWave(t, phase) {
-    return (
-      Math.sin(t + phase) * 1.0 +
-      Math.sin(2.0 * t - phase * 0.61) * 0.5 +
-      Math.sin(3.4 * t + phase * 1.34) * 0.24
-    );
-  }
-
-  function vectorField(x, y, time) {
-    const nx = x * 0.0028;
-    const ny = y * 0.0028;
-    const n = fbm(nx + time * 0.1, ny - time * 0.08, 4);
-    const f = fourierWave(nx * 1.7 + ny * 1.4, time * 2.3 + fxState.scrollCurrent * 3.5);
-    const angle = n * Math.PI * 4.5 + f * 0.48;
-    return {
-      ax: Math.cos(angle),
-      ay: Math.sin(angle),
-      mag: 0.3 + n * 0.65,
-    };
-  }
-
-  function createParticle() {
-    return {
-      x: Math.random() * w,
-      y: Math.random() * h,
-      vx: (Math.random() - 0.5) * 0.4,
-      vy: (Math.random() - 0.5) * 0.4,
-      hue: Math.random() < 0.56 ? 150 : 4,
-      life: Math.random() * 1000,
-      alpha: 0.08 + Math.random() * 0.16,
-      mass: 0.6 + Math.random() * 1.3,
-    };
-  }
-
-  function initAutomata() {
-    cellCols = Math.max(28, Math.floor(w / 26));
-    cellRows = Math.max(18, Math.floor(h / 26));
-    automata = Array.from({ length: cellCols * cellRows }, () => (Math.random() < 0.16 ? 1 : 0));
-  }
-
-  function stepAutomata() {
-    if (frameCount % 5 !== 0) return;
-    const next = new Array(automata.length).fill(0);
-    for (let y = 0; y < cellRows; y++) {
-      for (let x = 0; x < cellCols; x++) {
-        let n = 0;
-        for (let oy = -1; oy <= 1; oy++) {
-          for (let ox = -1; ox <= 1; ox++) {
-            if (ox === 0 && oy === 0) continue;
-            const nx = (x + ox + cellCols) % cellCols;
-            const ny = (y + oy + cellRows) % cellRows;
-            n += automata[ny * cellCols + nx];
-          }
-        }
-        const idx = y * cellCols + x;
-        const alive = automata[idx] === 1;
-        next[idx] = alive ? (n === 2 || n === 3 ? 1 : 0) : (n === 3 ? 1 : 0);
-      }
-    }
-    automata = next;
-  }
-
-  function resize() {
-    dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-    w = window.innerWidth;
-    h = window.innerHeight;
-    canvas.width = Math.floor(w * dpr);
-    canvas.height = Math.floor(h * dpr);
-    canvas.style.width = `${w}px`;
-    canvas.style.height = `${h}px`;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    particles = Array.from({ length: Math.max(220, Math.min(560, Math.floor((w * h) / 3500))) }, createParticle);
-    initAutomata();
-  }
-
-  function drawProceduralField(time) {
-    const s = 11;
-    ctx.clearRect(0, 0, w, h);
-
-    for (let y = 0; y < h; y += s) {
-      for (let x = 0; x < w; x += s) {
-        const nx = x / w;
-        const ny = y / h;
-        const n = fbm(nx * 3.6 + time * 0.08, ny * 3.3 - time * 0.06, 4);
-        const wave = fourierWave((nx - ny) * 5.2, time * 1.9 + fxState.scrollCurrent * 7.4) * 0.09;
-        const v = n + wave;
-        if (v < 0.43) continue;
-        const hue = v > 0.64 ? 152 : 5;
-        const alpha = (v - 0.4) * (0.22 + fxState.boardEnergy * 0.08 + fxState.movePulse * 0.12);
-        ctx.fillStyle = `hsla(${hue}, 56%, ${hue === 152 ? 26 : 30}%, ${alpha.toFixed(3)})`;
-        ctx.fillRect(x, y, s, s);
-      }
-    }
-
-    const cw = w / cellCols;
-    const ch = h / cellRows;
-    for (let y = 0; y < cellRows; y++) {
-      for (let x = 0; x < cellCols; x++) {
-        if (!automata[y * cellCols + x]) continue;
-        const hue = (x + y + Math.floor(time * 100)) % 7 < 4 ? 152 : 6;
-        ctx.fillStyle = `hsla(${hue}, 52%, 46%, 0.04)`;
-        ctx.fillRect(x * cw, y * ch, Math.max(1, cw * 0.74), Math.max(1, ch * 0.74));
-      }
-    }
-  }
-
-  function updateParticles(time) {
-    const mx = fxState.mouseWorldX;
-    const my = fxState.mouseWorldY;
-    const mouseActive = mx > 0 && my > 0;
-    const pulse = fxState.movePulse;
-
-    ctx.fillStyle = "rgba(8, 8, 8, 0.14)";
-    ctx.fillRect(0, 0, w, h);
-
-    for (const p of particles) {
-      p.life += 0.004;
-
-      const f = vectorField(p.x, p.y, time + p.life);
-      p.vx += f.ax * 0.08 * f.mag;
-      p.vy += f.ay * 0.08 * f.mag;
-
-      if (mouseActive) {
-        const dx = mx - p.x;
-        const dy = my - p.y;
-        const d = Math.hypot(dx, dy) + 0.001;
-        const influence = Math.max(0, 1 - d / 220);
-        const force = influence * (fxState.mouseDown ? -0.9 : 0.74);
-        p.vx += (dx / d) * force;
-        p.vy += (dy / d) * force;
-      }
-
-      p.vx += (Math.random() - 0.5) * 0.02;
-      p.vy += (Math.random() - 0.5) * 0.02;
-
-      p.vx *= 0.965;
-      p.vy *= 0.965;
-
-      p.x += p.vx * p.mass;
-      p.y += p.vy * p.mass;
-
-      if (p.x < -10) p.x = w + 10;
-      if (p.x > w + 10) p.x = -10;
-      if (p.y < -10) p.y = h + 10;
-      if (p.y > h + 10) p.y = -10;
-
-      const radius = 4 + p.mass * 2.8 + pulse * 4;
-      const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, radius * 1.8);
-      grad.addColorStop(0, `hsla(${p.hue}, 60%, 64%, ${(p.alpha + pulse * 0.22).toFixed(3)})`);
-      grad.addColorStop(1, `hsla(${p.hue}, 60%, 64%, 0)`);
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, radius * 1.8, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    for (let i = 0; i < particles.length; i += 2) {
-      const a = particles[i];
-      for (let j = i + 1; j < particles.length; j += 6) {
-        const b = particles[j];
-        const dx = a.x - b.x;
-        const dy = a.y - b.y;
-        const d = Math.hypot(dx, dy);
-        if (d > 72) continue;
-        const alpha = (1 - d / 72) * (0.06 + pulse * 0.1);
-        ctx.strokeStyle = `rgba(138, 166, 149, ${alpha.toFixed(3)})`;
-        ctx.lineWidth = 0.9;
-        ctx.beginPath();
-        ctx.moveTo(a.x, a.y);
-        ctx.lineTo(b.x, b.y);
-        ctx.stroke();
-      }
-    }
-  }
-
-  function animate() {
-    if (reduceMotion) return;
-    frameCount++;
-    const t = performance.now() * 0.00024;
-    stepAutomata();
-    drawProceduralField(t);
-    updateParticles(t);
-    requestAnimationFrame(animate);
-  }
-
-  resize();
-  if (!reduceMotion) requestAnimationFrame(animate);
-  window.addEventListener("resize", resize);
 }
 
 function startGame() {
@@ -827,9 +523,137 @@ function startGame() {
   state.undoUsed = false;
   state.snapshotBeforeMove = null;
   state.info = "";
+  state.lastMove = null;
+  state.lastMoveAt = 0;
   applyPassLogic();
   render();
   scheduleBotTurn();
+}
+
+function initBackground() {
+  const ctx = bgCanvas.getContext("2d", { alpha: true });
+  if (!ctx) return;
+
+  let width = 0;
+  let height = 0;
+  let dpr = 1;
+
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const fract = (v) => v - Math.floor(v);
+  const fade = (t) => t * t * (3 - 2 * t);
+
+  const LOW0 = [11, 11, 10];
+  const LOW1 = [36, 24, 20];
+  const MID = [31, 143, 95];
+  const HIGH = [110, 23, 23];
+
+  function hash2(x, y) {
+    return fract(Math.sin(x * 127.1 + y * 311.7) * 43758.5453123);
+  }
+
+  function valueNoise(x, y) {
+    const xi = Math.floor(x);
+    const yi = Math.floor(y);
+    const xf = x - xi;
+    const yf = y - yi;
+
+    const n00 = hash2(xi, yi);
+    const n10 = hash2(xi + 1, yi);
+    const n01 = hash2(xi, yi + 1);
+    const n11 = hash2(xi + 1, yi + 1);
+
+    const u = fade(xf);
+    const v = fade(yf);
+
+    return lerp(lerp(n00, n10, u), lerp(n01, n11, u), v);
+  }
+
+  function fbm(x, y) {
+    let total = 0;
+    let amp = 0.58;
+    let freq = 1;
+    let norm = 0;
+    for (let i = 0; i < 4; i++) {
+      total += valueNoise(x * freq, y * freq) * amp;
+      norm += amp;
+      amp *= 0.5;
+      freq *= 2.03;
+    }
+    return total / norm;
+  }
+
+  function colorFor(v) {
+    let c0;
+    let c1;
+    let t;
+    if (v < 0.36) {
+      c0 = LOW0;
+      c1 = LOW1;
+      t = v / 0.36;
+    } else if (v < 0.72) {
+      c0 = LOW1;
+      c1 = MID;
+      t = (v - 0.36) / 0.36;
+    } else {
+      c0 = MID;
+      c1 = HIGH;
+      t = (v - 0.72) / 0.28;
+    }
+    return [
+      Math.round(lerp(c0[0], c1[0], t)),
+      Math.round(lerp(c0[1], c1[1], t)),
+      Math.round(lerp(c0[2], c1[2], t)),
+    ];
+  }
+
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+    width = window.innerWidth;
+    height = window.innerHeight;
+    bgCanvas.width = Math.floor(width * dpr);
+    bgCanvas.height = Math.floor(height * dpr);
+    bgCanvas.style.width = `${width}px`;
+    bgCanvas.style.height = `${height}px`;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function draw(time) {
+    bgState.offsetX += (bgState.targetOffsetX - bgState.offsetX) * 0.06;
+    bgState.offsetY += (bgState.targetOffsetY - bgState.offsetY) * 0.06;
+    bgState.scrollValue += (bgState.scrollTarget - bgState.scrollValue) * 0.06;
+
+    const step = 14;
+    for (let y = 0; y < height; y += step) {
+      for (let x = 0; x < width; x += step) {
+        const nx = x / width;
+        const ny = y / height;
+        const n = fbm(
+          nx * 4 + bgState.offsetX + time * 0.00011 + bgState.scrollValue * 0.8,
+          ny * 4 + bgState.offsetY - time * 0.00009 - bgState.scrollValue * 0.6
+        );
+        const c = colorFor(n);
+        ctx.fillStyle = `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
+        ctx.fillRect(x, y, step, step);
+      }
+    }
+    requestAnimationFrame(draw);
+  }
+
+  window.addEventListener("mousemove", (event) => {
+    bgState.mouseX = event.clientX / Math.max(1, width);
+    bgState.mouseY = event.clientY / Math.max(1, height);
+    bgState.targetOffsetX = (bgState.mouseX - 0.5) * 0.55;
+    bgState.targetOffsetY = (bgState.mouseY - 0.5) * 0.55;
+  });
+
+  window.addEventListener("scroll", () => {
+    const max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+    bgState.scrollTarget = Math.min(1, window.scrollY / max);
+  }, { passive: true });
+
+  resize();
+  requestAnimationFrame(draw);
+  window.addEventListener("resize", resize);
 }
 
 newGameBtn.addEventListener("click", startGame);
@@ -841,12 +665,9 @@ undoBtn.addEventListener("click", () => {
   state.snapshotBeforeMove = null;
   state.undoUsed = true;
   state.info = "Última jogada desfeita.";
-  fxState.movePulse = 0.45;
   render();
   scheduleBotTurn();
 });
 
-initUIPhysics();
-startVisualLoop();
-startBackgroundSystem();
+initBackground();
 startGame();
