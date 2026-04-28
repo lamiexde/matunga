@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Matunga — Especificação Completa do Jogo</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg0: #080810;
+    --bg1: #0d0c1a;
+    --bg2: #121128;
+    --bg3: #1a1838;
+    --bd:  #232040;
+    --bd2: #2e2c55;
+    --acc: #6c5ce7;
+    --acc2: #a29bfe;
+    --acc3: #00cec9;
+    --tx0: #eeeaf8;
+    --tx1: #a09bc8;
+    --tx2: #5a5680;
+    --uni: #f8b739;
+    --hor: #00cec9;
+    --win: #00b894;
+    --dan: #e17055;
+    --mono: 'Space Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg0);
+    color: var(--tx0);
+    line-height: 1.6;
+    padding: 0;
+  }
+
+  /* ─── Layout ─── */
+  .page { max-width: 860px; margin: 0 auto; padding: 3rem 2rem 6rem; }
+
+  /* ─── Header ─── */
+  .hero { border-bottom: 1px solid var(--bd); padding-bottom: 2.5rem; margin-bottom: 3rem; }
+  .hero-eyebrow { font-family: var(--mono); font-size: 11px; color: var(--acc); letter-spacing: .18em; text-transform: uppercase; margin-bottom: .75rem; }
+  .hero h1 { font-size: clamp(2rem, 5vw, 3.2rem); font-weight: 800; line-height: 1.1; }
+  .hero h1 span { color: var(--acc2); }
+  .hero-sub { font-size: 15px; color: var(--tx1); margin-top: .75rem; max-width: 540px; }
+  .meta-row { display: flex; gap: 1.5rem; margin-top: 1.5rem; flex-wrap: wrap; }
+  .meta-pill { font-family: var(--mono); font-size: 11px; background: var(--bg2); border: 1px solid var(--bd); border-radius: 20px; padding: 4px 12px; color: var(--tx1); }
+
+  /* ─── Section titles ─── */
+  .sec-label {
+    font-family: var(--mono); font-size: 10px; color: var(--tx2);
+    letter-spacing: .22em; text-transform: uppercase;
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 1.25rem;
+  }
+  .sec-label::after { content: ''; flex: 1; height: 1px; background: var(--bd); }
+  .sec-num { color: var(--acc); margin-right: 4px; }
+
+  section { margin-bottom: 3rem; }
+
+  /* ─── Cards ─── */
+  .card {
+    background: var(--bg1); border: 1px solid var(--bd);
+    border-radius: 12px; padding: 1.25rem 1.5rem;
+    margin-bottom: .75rem; position: relative; overflow: hidden;
+  }
+  .card:hover { border-color: var(--bd2); }
+  .card-title { font-size: 14px; font-weight: 700; color: var(--acc2); margin-bottom: .4rem; }
+  .card-body { font-size: 13px; color: var(--tx1); line-height: 1.7; }
+  .card-body strong { color: var(--tx0); font-weight: 600; }
+  .card-accent { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; border-radius: 12px 0 0 12px; }
+  .ca-acc  { background: var(--acc); }
+  .ca-acc3 { background: var(--acc3); }
+  .ca-uni  { background: var(--uni); }
+  .ca-hor  { background: var(--hor); }
+  .ca-win  { background: var(--win); }
+  .ca-dan  { background: var(--dan); }
+  .card-inner { padding-left: .75rem; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+  @media (max-width: 560px) { .grid2 { grid-template-columns: 1fr; } }
+
+  code {
+    font-family: var(--mono); font-size: 11px;
+    background: var(--bg3); color: var(--acc2);
+    padding: 2px 6px; border-radius: 4px; border: 1px solid var(--bd);
+  }
+
+  ul.rule-list { list-style: none; padding: 0; margin-top: .5rem; display: flex; flex-direction: column; gap: 4px; }
+  ul.rule-list li { font-size: 12px; color: var(--tx1); padding-left: 14px; position: relative; line-height: 1.6; }
+  ul.rule-list li::before { content: '›'; position: absolute; left: 0; color: var(--tx2); }
+  ul.rule-list li strong { color: var(--tx0); font-weight: 600; }
+
+  /* ─── Board ─── */
+  .board-wrap { display: flex; justify-content: center; margin: 1.5rem 0; }
+  .board {
+    display: inline-grid;
+    grid-template-columns: repeat(6, 48px);
+    grid-template-rows: repeat(6, 48px);
+    gap: 3px;
+    background: var(--bg3);
+    border: 2px solid var(--bd2);
+    border-radius: 8px;
+    padding: 8px;
+  }
+  .cell {
+    width: 48px; height: 48px;
+    background: var(--bg2); border-radius: 5px;
+    border: 1px solid var(--bd);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; position: relative;
+    cursor: default;
+    transition: background .15s, border-color .15s;
+  }
+  .cell.uni { background: #1a1508; border-color: #443a10; }
+  .cell.hor { background: #081a18; border-color: #0e3a36; }
+  .cell.highlight { background: var(--bg3); border-color: var(--acc); border-style: dashed; }
+  .coord {
+    position: absolute; bottom: 2px; right: 3px;
+    font-family: var(--mono); font-size: 8px; color: var(--tx2); opacity: .6;
+  }
+
+  /* ─── L-shapes display ─── */
+  .l-shapes-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+  @media (max-width: 560px) { .l-shapes-grid { grid-template-columns: repeat(2, 1fr); } }
+
+  .l-card {
+    background: var(--bg2); border: 1px solid var(--bd);
+    border-radius: 8px; padding: .75rem;
+    display: flex; flex-direction: column; align-items: center; gap: .5rem;
+  }
+  .l-card-label { font-family: var(--mono); font-size: 10px; color: var(--tx2); }
+  .l-mini {
+    display: inline-grid;
+    gap: 2px;
+  }
+  .lc { width: 16px; height: 16px; border-radius: 3px; }
+  .lc.on  { background: var(--hor); }
+  .lc.off { background: var(--bg3); }
+
+  /* ─── Knight moves diagram ─── */
+  .knight-board {
+    display: inline-grid;
+    grid-template-columns: repeat(6, 36px);
+    grid-template-rows: repeat(6, 36px);
+    gap: 2px;
+    background: var(--bg3);
+    border-radius: 6px;
+    padding: 6px;
+  }
+  .kc {
+    width: 36px; height: 36px; border-radius: 4px;
+    background: var(--bg2); border: 1px solid var(--bd);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+  }
+  .kc.origin  { background: #1a0a30; border-color: var(--acc); font-size: 14px; }
+  .kc.reachable { background: #0a1e1c; border-color: var(--acc3); font-size: 12px; }
+
+  /* ─── Code block ─── */
+  .code-block {
+    background: var(--bg1); border: 1px solid var(--bd);
+    border-radius: 8px; padding: 1rem 1.25rem;
+    margin: .75rem 0;
+    overflow-x: auto;
+  }
+  .code-block pre {
+    font-family: var(--mono); font-size: 12px;
+    color: var(--tx1); line-height: 1.8; white-space: pre;
+  }
+  .code-block .kw  { color: var(--acc2); }
+  .code-block .fn  { color: var(--acc3); }
+  .code-block .cm  { color: var(--tx2); }
+  .code-block .str { color: var(--win); }
+  .code-block .num { color: var(--uni); }
+
+  /* ─── Strategy cards ─── */
+  .strat-card {
+    background: var(--bg1); border: 1px solid var(--bd);
+    border-radius: 12px; padding: 1.25rem 1.5rem;
+    margin-bottom: .75rem;
+  }
+  .strat-title { font-size: 14px; font-weight: 700; color: var(--tx0); margin-bottom: .3rem; display: flex; align-items: center; gap: 8px; }
+  .strat-badge {
+    font-family: var(--mono); font-size: 9px; padding: 2px 8px;
+    border-radius: 4px; font-weight: 400;
+  }
+  .sb-atk { background: #1a0808; color: var(--dan); }
+  .sb-def { background: #081a10; color: var(--win); }
+  .sb-gen { background: #0e0a20; color: var(--acc2); }
+  .strat-body { font-size: 13px; color: var(--tx1); line-height: 1.65; }
+  .strat-body strong { color: var(--tx0); font-weight: 600; }
+
+  /* ─── Win check table ─── */
+  .win-table { width: 100%; border-collapse: collapse; font-size: 12px; font-family: var(--mono); margin-top: .75rem; }
+  .win-table th { text-align: left; color: var(--tx2); font-weight: 400; padding: 6px 10px; border-bottom: 1px solid var(--bd); }
+  .win-table td { padding: 6px 10px; border-bottom: 1px solid var(--bd); color: var(--tx1); }
+  .win-table td:first-child { color: var(--acc2); }
+  .win-table tr:hover td { background: var(--bg2); }
+
+  /* ─── Flow diagram ─── */
+  .flow { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin: 1rem 0; }
+  .flow-step {
+    background: var(--bg2); border: 1px solid var(--bd);
+    border-radius: 8px; padding: .4rem .8rem;
+    font-size: 12px; color: var(--tx0);
+    font-family: var(--mono);
+  }
+  .flow-arr { color: var(--tx2); font-size: 16px; }
+
+  /* ─── Inline board mini ─── */
+  .scenario { background: var(--bg2); border: 1px solid var(--bd); border-radius: 8px; padding: .5rem; display: inline-grid; gap: 2px; }
+
+  /* ─── Divider ─── */
+  .divider { height: 1px; background: var(--bd); margin: 2rem 0; }
+
+  /* ─── Footer ─── */
+  .footer { font-family: var(--mono); font-size: 10px; color: var(--tx2); text-align: center; letter-spacing: .12em; padding-top: 2rem; border-top: 1px solid var(--bd); }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ─── HERO ─── -->
+  <div class="hero">
+    <div class="hero-eyebrow">// game specification · v1.0</div>
+    <h1>Matunga<br><span>Spec Completa</span></h1>
+    <p class="hero-sub">Jogo de tabuleiro 6×6 com cavalos de xadrez. Vence quem formar um L-tetromino com 4 peças. Documento de referência para implementação por IA.</p>
+    <div class="meta-row">
+      <span class="meta-pill">6×6 board</span>
+      <span class="meta-pill">2 jogadores</span>
+      <span class="meta-pill">12 peças totais</span>
+      <span class="meta-pill">movimento: cavalo</span>
+      <span class="meta-pill">vitória: L-tetromino</span>
+    </div>
+  </div>
+
+  <!-- ─── SEÇÃO 1: TABULEIRO ─── -->
+  <section id="board">
+    <div class="sec-label"><span class="sec-num">01</span> tabuleiro inicial</div>
+
+    <div class="card">
+      <div class="card-accent ca-acc"></div>
+      <div class="card-inner">
+        <div class="card-title">Setup: 6 × 6, peças nas colunas 0 e 5</div>
+        <div class="card-body">
+          O tabuleiro tem 6 colunas (0–5) e 6 linhas (0–5). Todas as 12 peças começam fixas nas colunas extremas.
+          As células internas (colunas 1–4) começam vazias. As peças alternam entre jogadores em cada linha.
+        </div>
+      </div>
+    </div>
+
+    <div class="board-wrap">
+      <div class="board" id="initial-board"></div>
+    </div>
+
+    <div class="grid2" style="margin-top:.75rem;">
+      <div class="card">
+        <div class="card-accent ca-uni"></div>
+        <div class="card-inner">
+          <div class="card-title">🦄 Unicórnio — posições iniciais</div>
+          <div class="card-body">
+            Col 0: linhas 0, 2, 4 &nbsp;|&nbsp; Col 5: linhas 1, 3, 5<br>
+            <code>(0,0)(2,0)(4,0)(1,5)(3,5)(5,5)</code>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-accent ca-hor"></div>
+        <div class="card-inner">
+          <div class="card-title">🐴 Cavalo — posições iniciais</div>
+          <div class="card-body">
+            Col 0: linhas 1, 3, 5 &nbsp;|&nbsp; Col 5: linhas 0, 2, 4<br>
+            <code>(1,0)(3,0)(5,0)(0,5)(2,5)(4,5)</code>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:.75rem;">
+      <div class="card-accent ca-acc3"></div>
+      <div class="card-inner">
+        <div class="card-title">Estrutura de dados recomendada</div>
+        <div class="card-body">Representar o tabuleiro como array 6×6 de strings: <code>""</code> vazio, <code>"U"</code> unicórnio, <code>"H"</code> cavalo. Coordenadas: <code>board[row][col]</code>.</div>
+      </div>
+    </div>
+
+    <div class="code-block"><pre>
+<span class="kw">const</span> <span class="fn">initBoard</span> = () <span class="kw">=></span> {
+  <span class="kw">const</span> b = Array.from({length: <span class="num">6</span>}, () => Array(<span class="num">6</span>).fill(<span class="str">""</span>));
+  <span class="cm">// coluna 0</span>
+  [<span class="num">0</span>,<span class="num">2</span>,<span class="num">4</span>].forEach(r => b[r][<span class="num">0</span>] = <span class="str">"U"</span>); <span class="cm">// unicórnio</span>
+  [<span class="num">1</span>,<span class="num">3</span>,<span class="num">5</span>].forEach(r => b[r][<span class="num">0</span>] = <span class="str">"H"</span>); <span class="cm">// cavalo</span>
+  <span class="cm">// coluna 5</span>
+  [<span class="num">1</span>,<span class="num">3</span>,<span class="num">5</span>].forEach(r => b[r][<span class="num">5</span>] = <span class="str">"U"</span>);
+  [<span class="num">0</span>,<span class="num">2</span>,<span class="num">4</span>].forEach(r => b[r][<span class="num">5</span>] = <span class="str">"H"</span>);
+  <span class="kw">return</span> b;
+};</pre></div>
+  </section>
+
+  <!-- ─── SEÇÃO 2: MOVIMENTO ─── -->
+  <section id="movement">
+    <div class="sec-label"><span class="sec-num">02</span> regra de movimento</div>
+
+    <div class="card">
+      <div class="card-accent ca-acc"></div>
+      <div class="card-inner">
+        <div class="card-title">Movimento idêntico ao cavalo de xadrez (L-knight)</div>
+        <div class="card-body">
+          A peça salta em L: <strong>2 casas em uma direção + 1 casa perpendicular</strong> (ou vice-versa).
+          8 destinos possíveis no centro; menos nas bordas. O salto ignora peças no caminho.
+          O destino deve estar <strong>vazio</strong> — qualquer peça no destino (própria ou adversária) torna o movimento <strong>ilegal</strong>.
+          <strong>Não há captura</strong>. As 12 peças permanecem no tabuleiro do início ao fim.
+        </div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div>
+        <p style="font-size:12px;color:var(--tx2);margin-bottom:.5rem;font-family:var(--mono);">Deltas de movimento</p>
+        <div class="code-block"><pre>
+<span class="kw">const</span> <span class="fn">DELTAS</span> = [
+  [-<span class="num">2</span>,-<span class="num">1</span>], [-<span class="num">2</span>,+<span class="num">1</span>],
+  [-<span class="num">1</span>,-<span class="num">2</span>], [-<span class="num">1</span>,+<span class="num">2</span>],
+  [+<span class="num">1</span>,-<span class="num">2</span>], [+<span class="num">1</span>,+<span class="num">2</span>],
+  [+<span class="num">2</span>,-<span class="num">1</span>], [+<span class="num">2</span>,+<span class="num">1</span>],
+];</pre></div>
+      </div>
+      <div>
+        <p style="font-size:12px;color:var(--tx2);margin-bottom:.5rem;font-family:var(--mono);">Movimentos válidos de (r,c)</p>
+        <div class="code-block"><pre>
+<span class="kw">function</span> <span class="fn">validMoves</span>(b, r, c) {
+  <span class="kw">const</span> player = b[r][c];
+  <span class="kw">return</span> DELTAS
+    .map(([dr, dc]) =>
+      [r+dr, c+dc])
+    .filter(([nr, nc]) =>
+      nr >= <span class="num">0</span> && nr < <span class="num">6</span> &&
+      nc >= <span class="num">0</span> && nc < <span class="num">6</span> &&
+      b[nr][nc] === <span class="str">""</span>);  <span class="cm">// apenas vazio — qualquer peça bloqueia</span>
+}</pre></div>
+      </div>
+    </div>
+
+    <p style="font-size:13px;color:var(--tx1);margin:.75rem 0 .5rem;">Alcance de uma peça em (2,2) — centro do tabuleiro (8 destinos possíveis):</p>
+    <div style="display:flex;justify-content:center;">
+      <div class="knight-board" id="knight-demo"></div>
+    </div>
+  </section>
+
+  <!-- ─── SEÇÃO 3: VITÓRIA ─── -->
+  <section id="win">
+    <div class="sec-label"><span class="sec-num">03</span> condição de vitória</div>
+
+    <div class="card">
+      <div class="card-accent ca-win"></div>
+      <div class="card-inner">
+        <div class="card-title">L-tetromino com 4 peças suas em qualquer orientação</div>
+        <div class="card-body">
+          Vence o jogador que, após qualquer jogada, tiver <strong>4 ou mais</strong> de suas peças
+          formando um L-tetromino (incluindo J-tetromino = espelho do L).
+          São <strong>8 orientações válidas</strong>. A verificação deve checar todas as 8 após cada lance.
+          Não é necessário que sejam exatamente 4 — se você tiver 5 peças e 4 delas formam um L, você vence.
+        </div>
+      </div>
+    </div>
+
+    <p style="font-size:13px;color:var(--tx1);margin:.75rem 0 .5rem;">As 8 orientações válidas do L-tetromino:</p>
+    <div class="l-shapes-grid" id="l-shapes-container"></div>
+
+    <div class="code-block" style="margin-top:1rem;"><pre>
+<span class="cm">// Todas as 8 orientações: offsets [dRow, dCol] relativos ao canto superior esquerdo</span>
+<span class="kw">const</span> <span class="fn">L_SHAPES</span> = [
+  [[<span class="num">0</span>,<span class="num">0</span>],[<span class="num">1</span>,<span class="num">0</span>],[<span class="num">2</span>,<span class="num">0</span>],[<span class="num">2</span>,<span class="num">1</span>]], <span class="cm">// L normal       ↓→</span>
+  [[<span class="num">0</span>,<span class="num">1</span>],[<span class="num">1</span>,<span class="num">1</span>],[<span class="num">2</span>,<span class="num">0</span>],[<span class="num">2</span>,<span class="num">1</span>]], <span class="cm">// J normal       ↓←</span>
+  [[<span class="num">0</span>,<span class="num">0</span>],[<span class="num">0</span>,<span class="num">1</span>],[<span class="num">0</span>,<span class="num">2</span>],[<span class="num">1</span>,<span class="num">0</span>]], <span class="cm">// L rot 90°CW    →↓</span>
+  [[<span class="num">0</span>,<span class="num">0</span>],[<span class="num">0</span>,<span class="num">1</span>],[<span class="num">0</span>,<span class="num">2</span>],[<span class="num">1</span>,<span class="num">2</span>]], <span class="cm">// J rot 90°CW    →↑</span>
+  [[<span class="num">0</span>,<span class="num">0</span>],[<span class="num">0</span>,<span class="num">1</span>],[<span class="num">1</span>,<span class="num">1</span>],[<span class="num">2</span>,<span class="num">1</span>]], <span class="cm">// L rot 180°     ↑→</span>
+  [[<span class="num">0</span>,<span class="num">0</span>],[<span class="num">0</span>,<span class="num">1</span>],[<span class="num">1</span>,<span class="num">0</span>],[<span class="num">2</span>,<span class="num">0</span>]], <span class="cm">// J rot 180°     ↑←</span>
+  [[<span class="num">0</span>,<span class="num">0</span>],[<span class="num">1</span>,<span class="num">0</span>],[<span class="num">1</span>,<span class="num">1</span>],[<span class="num">1</span>,<span class="num">2</span>]], <span class="cm">// L rot 270°     ↑→ (invertido)</span>
+  [[<span class="num">0</span>,<span class="num">2</span>],[<span class="num">1</span>,<span class="num">0</span>],[<span class="num">1</span>,<span class="num">1</span>],[<span class="num">1</span>,<span class="num">2</span>]], <span class="cm">// J rot 270°     ↑← (invertido)</span>
+];
+
+<span class="kw">function</span> <span class="fn">checkWin</span>(board, player) {
+  <span class="kw">const</span> positions = [];
+  <span class="kw">for</span> (<span class="kw">let</span> r = <span class="num">0</span>; r < <span class="num">6</span>; r++)
+    <span class="kw">for</span> (<span class="kw">let</span> c = <span class="num">0</span>; c < <span class="num">6</span>; c++)
+      <span class="kw">if</span> (board[r][c] === player) positions.push([r,c]);
+
+  <span class="kw">const</span> set = <span class="kw">new</span> Set(positions.map(([r,c]) => <span class="str">`${r},${c}`</span>));
+
+  <span class="kw">for</span> (<span class="kw">const</span> [r, c] <span class="kw">of</span> positions) {
+    <span class="kw">for</span> (<span class="kw">const</span> shape <span class="kw">of</span> L_SHAPES) {
+      <span class="kw">if</span> (shape.every(([dr, dc]) => set.has(<span class="str">`${r+dr},${c+dc}`</span>)))
+        <span class="kw">return true</span>;
+    }
+  }
+  <span class="kw">return false</span>;
+}</pre></div>
+  </section>
+
+  <!-- ─── SEÇÃO 4: FLUXO DO JOGO ─── -->
+  <section id="flow">
+    <div class="sec-label"><span class="sec-num">04</span> fluxo de jogo</div>
+
+    <div class="flow">
+      <div class="flow-step">🦄 inicia</div>
+      <div class="flow-arr">→</div>
+      <div class="flow-step">seleciona peça</div>
+      <div class="flow-arr">→</div>
+      <div class="flow-step">move (knight)</div>
+      <div class="flow-arr">→</div>
+      <div class="flow-step">check win</div>
+      <div class="flow-arr">→</div>
+      <div class="flow-step">🐴 vez</div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="card-accent ca-acc"></div>
+        <div class="card-inner">
+          <div class="card-title">Turno</div>
+          <ul class="rule-list">
+            <li>O jogador <strong>deve</strong> mover uma peça (sem passar a vez)</li>
+            <li>Move exatamente <strong>uma peça</strong> por turno</li>
+            <li>O destino deve ser <strong>vazio</strong> — peça própria ou adversária bloqueia igualmente</li>
+            <li>Após mover, verifica-se vitória para o jogador atual</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-accent ca-acc3"></div>
+        <div class="card-inner">
+          <div class="card-title">Bloqueio posicional</div>
+          <ul class="rule-list">
+            <li>Qualquer peça (própria ou adversária) <strong>bloqueia</strong> o destino igualmente</li>
+            <li>As 12 peças <strong>nunca saem</strong> do tabuleiro — contagem sempre 6+6</li>
+            <li>O centro fica congestionado com o avanço do jogo</li>
+            <li>Ocupar a célula que o adversário precisa para completar o L é o bloqueio fundamental</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-accent ca-acc3"></div>
+      <div class="card-inner">
+        <div class="card-title">Empate / sem movimentos</div>
+        <div class="card-body">
+          Se um jogador não tiver nenhum movimento válido (todas as suas peças completamente cercadas),
+          a vez passa ao adversário.
+          Se nenhum dos jogadores puder mover, o jogo termina em <strong>empate</strong>.
+          Como não há capturas, o número de peças nunca muda — ambos mantêm 6 peças até o fim.
+          O congestionamento do centro pode levar a posições de bloqueio mútuo.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── SEÇÃO 5: TÉCNICAS ESTRATÉGICAS ─── -->
+  <section id="strategy">
+    <div class="sec-label"><span class="sec-num">05</span> técnicas estratégicas</div>
+
+    <div class="strat-card">
+      <div class="strat-title">Centralização <span class="strat-badge sb-gen">fundamento</span></div>
+      <div class="strat-body">
+        Peças nas bordas têm <strong>2 movimentos possíveis</strong>; no centro, até <strong>8</strong>.
+        A prioridade nas primeiras jogadas é levar cavalos para as colunas 2–3 e linhas 2–3.
+        Um cavalo em (2,2) ou (3,3) pode alcançar 8 casas; um em (0,0) apenas 2.
+        Abrir com <code>(0,0)→(1,2)</code> ou <code>(2,0)→(3,2)</code> coloca peças no centro rapidamente.
+      </div>
+    </div>
+
+    <div class="strat-card">
+      <div class="strat-title">Proto-L (3 de 4) <span class="strat-badge sb-atk">ataque</span></div>
+      <div class="strat-body">
+        Construa as 3 peças de um L antes de precisar da 4ª. Um "proto-L" força o adversário a bloquear
+        a célula de completude ou perder. Identifique todas as 8 variantes — qual é mais rápida de completar
+        com seus cavalos atuais? Priorize formas onde a <strong>célula faltante</strong> está a 1 jogada de uma peça sua.
+      </div>
+    </div>
+
+    <div class="strat-card">
+      <div class="strat-title">Garfo (Fork) <span class="strat-badge sb-atk">ataque</span></div>
+      <div class="strat-body">
+        A técnica mais poderosa: ameace <strong>dois L diferentes simultaneamente</strong>.
+        O adversário pode bloquear apenas um. Para criar um fork, posicione uma peça que seja
+        a <em>peça faltante</em> de dois proto-L distintos ao mesmo tempo. O adversário fica em xeque-fork
+        e perde na próxima jogada.
+        <br><br>
+        <strong>Exemplo:</strong> Se você tem peças em (1,2), (2,2), (3,2) — coluna vertical de 3 —
+        e consegue colocar uma peça em (3,3), forma o L-normal. Mas se simultaneamente você tem
+        (2,1), (2,2), (2,3) — linha horizontal —, uma peça em (3,1) completa outro L. Se essas duas
+        ameaças existirem ao mesmo tempo, é um fork.
+      </div>
+    </div>
+
+    <div class="strat-card">
+      <div class="strat-title">Congestionamento do Centro <span class="strat-badge sb-gen">avançado</span></div>
+      <div class="strat-body">
+        Como não há captura, o centro do tabuleiro enche com o tempo. Uma estratégia válida é
+        <strong>avançar suas peças para as células que o adversário precisa</strong> — não para completar seu próprio L,
+        mas para negar o espaço. Isso força o adversário a trabalhar nas bordas, onde o cavalo tem
+        menos mobilidade. Risco: se você congesta o centro com suas próprias peças, também se limita.
+        Use o congestionamento para <em>direcionar</em> o adversário, não para paralisar o jogo.
+      </div>
+    </div>
+
+    <div class="strat-card">
+      <div class="strat-title">Defesa: Bloqueio Preventivo <span class="strat-badge sb-def">defesa</span></div>
+      <div class="strat-body">
+        Identifique proto-L do adversário e ocupe a célula de completude <strong>antes</strong> que ele possa.
+        Mova uma sua peça para essa célula (mesmo que o movimento pareça neutro ofensivamente).
+        Sua peça naquela célula é um bloqueador permanente enquanto estiver lá — o adversário
+        não tem como removê-la. Priorize bloquear o proto-L mais avançado (faltando 1 peça).
+      </div>
+    </div>
+
+    <div class="strat-card">
+      <div class="strat-title">Contagem de Jogadas (Tempo) <span class="strat-badge sb-gen">cálculo</span></div>
+      <div class="strat-body">
+        Cada peça nas bordas leva <strong>2–3 movimentos</strong> para chegar ao centro.
+        Antes de construir um L, conte: quantos lances faltam para completá-lo?
+        Quantos lances faltam para o adversário completar o dele?
+        Se o adversário chega em <strong>N−1</strong> jogadas, você precisa bloquear agora.
+        Priorize sempre o caminho mais curto para o L mais próximo de ser completado.
+      </div>
+    </div>
+
+    <div class="strat-card">
+      <div class="strat-title">Isca (Decoy) <span class="strat-badge sb-atk">avançado</span></div>
+      <div class="strat-body">
+        Construa um proto-L <em>visível</em> para atrair o bloqueador do adversário para uma região,
+        enquanto o L <strong>real</strong> está sendo montado silenciosamente em outro lado do tabuleiro.
+        Peças de xadrez têm mobilidade: é fácil construir ameaças em múltiplas regiões ao mesmo tempo.
+        O adversário tende a reagir ao mais óbvio — use isso.
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── SEÇÃO 6: IA / BOT ─── -->
+  <section id="ai">
+    <div class="sec-label"><span class="sec-num">06</span> implementação de IA (bot)</div>
+
+    <div class="card">
+      <div class="card-accent ca-acc"></div>
+      <div class="card-inner">
+        <div class="card-title">Função de avaliação de estado (heurística)</div>
+        <div class="card-body">Para cada estado do tabuleiro, o score do bot deve considerar:</div>
+        <ul class="rule-list" style="margin-top:.5rem;">
+          <li><strong>+1000</strong>: vitória imediata (L completo formado)</li>
+          <li><strong>+50 × N</strong>: N proto-L (3 de 4 células preenchidas)</li>
+          <li><strong>+10 × N</strong>: N pares-de-L (2 de 4 células em posição)</li>
+          <li><strong>+5 × moves</strong>: número de movimentos disponíveis (mobilidade)</li>
+          <li><strong>−30 × adversário_proto_L</strong>: proto-L do adversário (urgência de bloqueio)</li>
+          <li><strong>+8 × (3 − dist_centro)</strong>: peças mais próximas do centro</li>
+          <li><strong>+20</strong>: jogada que cria fork (duas ameaças simultâneas)</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="code-block"><pre>
+<span class="kw">function</span> <span class="fn">evaluate</span>(board, me, opp) {
+  <span class="kw">let</span> score = <span class="num">0</span>;
+  <span class="kw">const</span> center = [<span class="num">2.5</span>, <span class="num">2.5</span>];
+
+  <span class="kw">for</span> (<span class="kw">let</span> r = <span class="num">0</span>; r < <span class="num">6</span>; r++) {
+    <span class="kw">for</span> (<span class="kw">let</span> c = <span class="num">0</span>; c < <span class="num">6</span>; c++) {
+      <span class="kw">if</span> (board[r][c] === me) {
+        <span class="cm">// distância ao centro — menor = melhor</span>
+        <span class="kw">const</span> dist = Math.abs(r-center[<span class="num">0</span>]) + Math.abs(c-center[<span class="num">1</span>]);
+        score += <span class="num">8</span> * (<span class="num">5</span> - dist);
+      }
+    }
+  }
+
+  <span class="cm">// contar proto-L e pares para ambos os jogadores</span>
+  score += <span class="num">50</span> * <span class="fn">countProtoL</span>(board, me);
+  score -= <span class="num">30</span> * <span class="fn">countProtoL</span>(board, opp);
+  score += <span class="num">10</span> * <span class="fn">countPairL</span>(board, me);
+  score += <span class="num">5</span>  * <span class="fn">countMoves</span>(board, me);
+  score -= <span class="num">5</span>  * <span class="fn">countMoves</span>(board, opp);
+  <span class="kw">return</span> score;
+}
+
+<span class="cm">// countProtoL: verifica quantos L_SHAPES têm 3/4 células preenchidas pelo jogador</span>
+<span class="kw">function</span> <span class="fn">countProtoL</span>(board, player) {
+  <span class="kw">let</span> count = <span class="num">0</span>;
+  <span class="kw">for</span> (<span class="kw">let</span> r = <span class="num">0</span>; r < <span class="num">6</span>; r++)
+    <span class="kw">for</span> (<span class="kw">let</span> c = <span class="num">0</span>; c < <span class="num">6</span>; c++)
+      <span class="kw">for</span> (<span class="kw">const</span> shape <span class="kw">of</span> L_SHAPES) {
+        <span class="kw">const</span> filled = shape.filter(([dr,dc]) =>
+          r+dr<<span class="num">6</span> && c+dc<<span class="num">6</span> && board[r+dr][c+dc]===player).length;
+        <span class="kw">if</span> (filled === <span class="num">3</span>) count++;
+      }
+  <span class="kw">return</span> count;
+}</pre></div>
+
+    <div class="card">
+      <div class="card-accent ca-acc3"></div>
+      <div class="card-inner">
+        <div class="card-title">Minimax com alpha-beta (profundidade recomendada: 3–4)</div>
+        <div class="card-body">
+          Para dificuldade média, use minimax com profundidade 3 (rápido).
+          Para dificuldade difícil, profundidade 4–5 com poda alpha-beta.
+          O espaço de estados do Matunga é limitado — o jogo tende a terminar em 15–30 lances.
+          <strong>Iterative deepening</strong> com time limit de 1s é a abordagem mais robusta para produção.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── SEÇÃO 7: PRINCÍPIOS PARA BUILD ─── -->
+  <section id="build">
+    <div class="sec-label"><span class="sec-num">07</span> princípios para o site do matunga</div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="card-accent ca-acc"></div>
+        <div class="card-inner">
+          <div class="card-title">Visual dark-first</div>
+          <ul class="rule-list">
+            <li>Fundo <code>#080810</code> → camadas até <code>#1a1838</code></li>
+            <li>🦄 em dourado <code>#f8b739</code>, 🐴 em ciano <code>#00cec9</code></li>
+            <li>Highlight de célula selecionada: borda pontilhada roxa</li>
+            <li>Células de destino válido: borda verde sutil</li>
+            <li>Animação de movimento: slide suave da peça até o destino</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-accent ca-win"></div>
+        <div class="card-inner">
+          <div class="card-title">UX do tabuleiro</div>
+          <ul class="rule-list">
+            <li>Click/tap em peça própria: <strong>seleciona + mostra destinos</strong></li>
+            <li>Click em destino válido: <strong>executa movimento</strong></li>
+            <li>Click em célula inválida: <strong>deseleciona</strong></li>
+            <li>Highlight do L vencedor com animação pulse</li>
+            <li>Histórico de movimentos em notação <code>(r,c)→(r,c)</code></li>
+          </ul>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-accent ca-uni"></div>
+        <div class="card-inner">
+          <div class="card-title">Modos de jogo</div>
+          <ul class="rule-list">
+            <li>🧑 vs 🧑 — dois jogadores local</li>
+            <li>🧑 vs 🤖 — jogador vs bot (3 dificuldades)</li>
+            <li>🤖 vs 🤖 — simulação automática</li>
+            <li>Opção de <strong>desfazer jogada</strong> (undo) 1×</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-accent ca-hor"></div>
+        <div class="card-inner">
+          <div class="card-title">Stack recomendada</div>
+          <ul class="rule-list">
+            <li>React + Vite (ou HTML/JS puro para simplicidade)</li>
+            <li>CSS Grid para o tabuleiro (6×6 natural)</li>
+            <li>State: <code>board[][],turn,selected,gameOver</code></li>
+            <li>Sem libs externas além de animação (Framer ou CSS)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+  <div class="footer">// matunga spec v1.0 · gerado por ia · use como instrução completa de build</div>
+
+</div>
+
+<script>
+  /* ── Tabuleiro inicial ── */
+  const initSetup = Array.from({length:6},()=>Array(6).fill(''));
+  [[0,2,4].forEach(r=>{initSetup[r][0]='U'})];
+  [1,3,5].forEach(r=>{initSetup[r][0]='H'});
+  [1,3,5].forEach(r=>{initSetup[r][5]='U'});
+  [0,2,4].forEach(r=>{initSetup[r][5]='H'});
+  [0,2,4].forEach(r=>{initSetup[r][0]='U'});
+
+  const boardEl = document.getElementById('initial-board');
+  for(let r=0;r<6;r++){
+    for(let c=0;c<6;c++){
+      const cell = document.createElement('div');
+      cell.className = 'cell' + (initSetup[r][c]==='U'?' uni':initSetup[r][c]==='H'?' hor':'');
+      cell.innerHTML = initSetup[r][c]==='U'?'🦄':initSetup[r][c]==='H'?'🐴':'';
+      const coord = document.createElement('span');
+      coord.className='coord';
+      coord.textContent=`${r},${c}`;
+      cell.appendChild(coord);
+      boardEl.appendChild(cell);
+    }
+  }
+
+  /* ── Knight demo board ── */
+  const origin = [2,2];
+  const DELTAS = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+  const knightEl = document.getElementById('knight-demo');
+  for(let r=0;r<6;r++){
+    for(let c=0;c<6;c++){
+      const cell = document.createElement('div');
+      const isOrigin = r===origin[0]&&c===origin[1];
+      const isReach = DELTAS.some(([dr,dc])=>r===origin[0]+dr&&c===origin[1]+dc);
+      cell.className = 'kc' + (isOrigin?' origin':isReach?' reachable':'');
+      cell.textContent = isOrigin?'♞':isReach?'◉':'';
+      knightEl.appendChild(cell);
+    }
+  }
+
+  /* ── L-shapes display ── */
+  const L_DEFS = [
+    { label:'L normal',   grid:[[1,0],[1,0],[1,1],[0,0]], w:2, h:3 },
+    { label:'J normal',   grid:[[0,1],[0,1],[1,1],[0,0]], w:2, h:3 },
+    { label:'L rot 90°',  grid:[[1,1,1],[1,0,0]], w:3, h:2 },
+    { label:'J rot 90°',  grid:[[1,1,1],[0,0,1]], w:3, h:2 },
+    { label:'L rot 180°', grid:[[1,1],[0,1],[0,1]], w:2, h:3 },
+    { label:'J rot 180°', grid:[[1,1],[1,0],[1,0]], w:2, h:3 },
+    { label:'L rot 270°', grid:[[1,0,0],[1,1,1]], w:3, h:2 },
+    { label:'J rot 270°', grid:[[0,0,1],[1,1,1]], w:3, h:2 },
+  ];
+
+  const container = document.getElementById('l-shapes-container');
+  L_DEFS.forEach(def=>{
+    const card = document.createElement('div');
+    card.className='l-card';
+    const label = document.createElement('div');
+    label.className='l-card-label';
+    label.textContent=def.label;
+    const grid = document.createElement('div');
+    grid.className='l-mini';
+    grid.style.gridTemplateColumns = `repeat(${def.w},16px)`;
+    grid.style.gridTemplateRows = `repeat(${def.h},16px)`;
+    def.grid.forEach(row=>{
+      if(Array.isArray(row)){
+        row.forEach(v=>{
+          const lc=document.createElement('div');
+          lc.className='lc '+(v?'on':'off');
+          grid.appendChild(lc);
+        });
+      }
+    });
+    card.appendChild(label);
+    card.appendChild(grid);
+    container.appendChild(card);
+  });
+</script>
+</body>
+</html>
