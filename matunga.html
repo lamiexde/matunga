@@ -4,431 +4,465 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Matunga</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Cinzel:wght@500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Orbitron:wght@500;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg0: #1e1e1e;
-      --bg1: rgba(42, 42, 42, 0.74);
-      --bg2: rgba(58, 42, 36, 0.82);
-      --bg3: rgba(43, 31, 26, 0.94);
-      --graphite: #2a2a2a;
-      --brown-0: #2b1f1a;
-      --brown-1: #3a2a24;
-      --green-0: #0f3d2e;
-      --green-1: #145c43;
-      --wine-0: #5a1a1a;
-      --wine-1: #7a1f1f;
-      --bd: rgba(128, 97, 80, 0.55);
-      --bd2: rgba(169, 128, 103, 0.62);
-      --tx0: #e7ddd5;
-      --tx1: #c8b6aa;
-      --tx2: #8f7b70;
-      --acc: #7ea98f;
-      --uni: #ceb59e;
-      --hor: #79b397;
-      --win: #9fcdad;
-      --ok: #98c7a5;
-      --danger: #c98282;
-      --shadow-soft: 0 14px 38px rgba(0, 0, 0, 0.34);
-      --shadow-deep: 0 22px 68px rgba(0, 0, 0, 0.45);
-      --ease-smooth: cubic-bezier(0.22, 0.61, 0.36, 1);
-    }
-    body {
+      --black: #121212;
+      --graphite: #1e1e1e;
+      --graphite-2: #2a2a2a;
+      --brown: #2b1f1a;
+      --brown-2: #3a2a24;
+      --green: #0f3d2e;
+      --green-2: #145c43;
+      --red: #5a1a1a;
+      --red-2: #7a1f1f;
+      --txt: #ddd5cf;
+      --txt-soft: #a99a92;
+      --win: #9ac9ae;
+      --shadow: 0 24px 60px rgba(0, 0, 0, 0.46);
       --mx: 0;
       --my: 0;
-      --scroll: 0;
-      font-family: "Inter", system-ui, -apple-system, sans-serif;
-      background:
-        radial-gradient(circle at 10% 10%, rgba(122, 31, 31, 0.16), transparent 36%),
-        radial-gradient(circle at 85% 14%, rgba(20, 92, 67, 0.22), transparent 40%),
-        linear-gradient(150deg, #232323 0%, #1b1b1b 34%, #2b1f1a 66%, #1a1716 100%);
-      color: var(--tx0);
-      min-height: 100vh;
+      --tilt: 0;
+      --scroll-energy: 0;
+      --pulse: 0;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background: var(--black);
+      color: var(--txt);
+      font-family: "Inter", system-ui, sans-serif;
       overflow-x: hidden;
     }
+
     body::before {
       content: "";
       position: fixed;
       inset: 0;
       pointer-events: none;
-      z-index: 1;
-      box-shadow: inset 0 0 140px rgba(0, 0, 0, 0.62);
+      z-index: 2;
+      background:
+        radial-gradient(circle at 50% 10%, rgba(255, 255, 255, 0.03), transparent 42%),
+        radial-gradient(circle at 50% 100%, rgba(0, 0, 0, 0.52), transparent 45%);
+      mix-blend-mode: screen;
     }
-    #fx-nebula,
-    #fx-particles {
+
+    #bg-system {
       position: fixed;
       inset: 0;
       z-index: 0;
       pointer-events: none;
+      opacity: 0.95;
     }
-    #fx-nebula {
-      opacity: 0.52;
-      filter: blur(0.2px) saturate(1.04);
+
+    #arena {
+      position: relative;
+      z-index: 5;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: clamp(18px, 2.3vw, 34px);
+      perspective: 1450px;
+      transform-style: preserve-3d;
     }
-    #fx-particles {
-      opacity: 0.72;
-    }
-    .fx-noise {
-      position: fixed;
-      inset: 0;
+
+    #brand-title {
+      position: absolute;
+      top: clamp(12px, 3vw, 34px);
+      left: clamp(18px, 4vw, 56px);
+      margin: 0;
+      font-family: "Orbitron", "Inter", sans-serif;
+      font-size: clamp(1.5rem, 4vw, 3rem);
+      letter-spacing: 0.17em;
+      text-transform: uppercase;
+      color: #c9c2bd;
+      text-shadow:
+        0 0 14px rgba(20, 92, 67, 0.25),
+        0 0 22px rgba(122, 31, 31, 0.18);
+      transform: translate3d(calc(var(--mx) * 22px), calc(var(--my) * 18px), 60px) rotateZ(calc(var(--mx) * 2deg));
+      transition: transform 220ms ease-out;
       pointer-events: none;
-      z-index: 1;
-      opacity: 0.08;
-      background-image:
-        radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.32) 0 0.7px, transparent 1px),
-        radial-gradient(circle at 70% 30%, rgba(255, 255, 255, 0.18) 0 0.7px, transparent 1px),
-        radial-gradient(circle at 40% 80%, rgba(255, 255, 255, 0.22) 0 0.7px, transparent 1px);
-      background-size: 7px 7px, 11px 11px, 9px 9px;
-      mix-blend-mode: soft-light;
+      user-select: none;
     }
-    .fx-blobs {
-      position: fixed;
+
+    #brand-title::after {
+      content: "MATUNGA";
+      position: absolute;
       inset: 0;
+      color: rgba(120, 164, 142, 0.24);
+      transform: translate(calc(var(--mx) * -12px), calc(var(--my) * -8px));
+      filter: blur(0.7px);
       pointer-events: none;
-      z-index: 0;
+    }
+
+    #stage {
+      width: min(1180px, 96vw);
+      min-height: min(760px, 92vh);
+      display: grid;
+      grid-template-columns: 1fr minmax(280px, 0.56fr);
+      gap: clamp(12px, 2vw, 26px);
+      align-items: center;
+      transform-style: preserve-3d;
+      transform:
+        translate3d(calc(var(--mx) * 22px), calc(var(--my) * 20px), 0)
+        rotateX(calc(2deg + var(--scroll-energy) * 4deg))
+        rotateY(calc(var(--mx) * -9deg))
+        rotateZ(calc(var(--tilt) * 1deg));
+      transition: transform 280ms cubic-bezier(0.22, 0.61, 0.36, 1);
+    }
+
+    #board-3d {
+      position: relative;
+      min-height: 580px;
+      border-radius: 26px;
+      border: 1px solid rgba(148, 122, 108, 0.42);
+      background:
+        linear-gradient(145deg, rgba(30, 30, 30, 0.84), rgba(43, 31, 26, 0.76)),
+        radial-gradient(circle at 12% 10%, rgba(20, 92, 67, 0.22), transparent 52%),
+        radial-gradient(circle at 88% 85%, rgba(122, 31, 31, 0.18), transparent 44%);
+      box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+      transform-style: preserve-3d;
+      clip-path: polygon(0 3%, 100% 0, 98% 100%, 3% 97%);
+      isolation: isolate;
       overflow: hidden;
     }
-    .blob {
-      position: absolute;
-      border-radius: 50%;
-      filter: blur(50px);
-      opacity: 0.26;
-      will-change: transform;
-      animation: blobFloat 18s var(--ease-smooth) infinite alternate;
-    }
-    .blob.green {
-      width: 36vw;
-      height: 36vw;
-      min-width: 260px;
-      min-height: 260px;
-      left: -8vw;
-      top: 42vh;
-      background: radial-gradient(circle, rgba(20, 92, 67, 0.52), rgba(20, 92, 67, 0));
-    }
-    .blob.red {
-      width: 30vw;
-      height: 30vw;
-      min-width: 220px;
-      min-height: 220px;
-      right: -6vw;
-      top: 4vh;
-      animation-delay: -6s;
-      background: radial-gradient(circle, rgba(122, 31, 31, 0.4), rgba(122, 31, 31, 0));
-    }
-    .fx-aurora {
-      position: fixed;
-      inset: -10% -12%;
-      z-index: 0;
-      pointer-events: none;
-      background:
-        radial-gradient(circle at 14% 40%, rgba(20, 92, 67, 0.16), transparent 40%),
-        radial-gradient(circle at 82% 16%, rgba(122, 31, 31, 0.13), transparent 35%),
-        radial-gradient(circle at 55% 100%, rgba(58, 42, 36, 0.18), transparent 45%);
-      animation: auroraShift 18s ease-in-out infinite alternate;
-      filter: blur(18px);
-    }
-    main.container {
-      position: relative;
-      z-index: 2;
-      max-width: 1080px;
-      transform: translate3d(calc(var(--mx) * 8px), calc(var(--my) * 10px - var(--scroll) * 8px), 0);
-      transition: transform 220ms var(--ease-smooth);
-    }
-    .glass {
-      background: linear-gradient(135deg, rgba(48, 37, 33, 0.78), rgba(34, 34, 34, 0.75));
-      border: 1px solid var(--bd);
-      border-radius: 14px;
-      box-shadow: var(--shadow-soft), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-      backdrop-filter: blur(10px);
-      transform: translateZ(0);
-      transition: transform 380ms var(--ease-smooth), box-shadow 380ms var(--ease-smooth), border-color 320ms var(--ease-smooth);
-    }
-    .glass:hover {
-      transform: translateY(-3px) scale(1.005);
-      box-shadow: var(--shadow-deep), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-      border-color: rgba(159, 205, 173, 0.48);
-    }
-    .text-soft { color: var(--tx1); }
-    .badge-soft {
-      background: linear-gradient(180deg, rgba(58, 42, 36, 0.95), rgba(43, 31, 26, 0.92));
-      border: 1px solid var(--bd2);
-      color: var(--tx1);
-      font-weight: 500;
-      letter-spacing: 0.02em;
-      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
-    }
-    h1.h2 {
-      font-family: "Cinzel", serif;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      background: linear-gradient(120deg, #e9d9c9, #bca08e 55%, #8db39d);
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
-      text-shadow: 0 0 14px rgba(141, 179, 157, 0.18);
-      position: relative;
-      isolation: isolate;
-      animation: titlePulse 4.4s ease-in-out infinite;
-    }
-    h1.h2::after {
-      content: "Matunga";
+
+    #board-3d::before {
+      content: "";
       position: absolute;
       inset: 0;
-      color: rgba(201, 130, 130, 0.16);
-      transform: translate(calc(var(--mx) * -4px), calc(var(--my) * -2px));
-      filter: blur(0.4px);
-      z-index: -1;
+      background:
+        linear-gradient(110deg, rgba(255, 255, 255, 0.03), transparent 24%),
+        linear-gradient(290deg, rgba(255, 255, 255, 0.03), transparent 20%);
       pointer-events: none;
     }
-    .hero-sub {
-      max-width: 650px;
-      font-size: 1.02rem;
-      line-height: 1.65;
-    }
-    .section-title {
-      text-transform: uppercase;
-      letter-spacing: 0.16em;
-      color: var(--tx2);
-      font-size: 0.76rem;
-      margin-bottom: 0.5rem;
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .section-title::after {
-      content: "";
-      width: 36px;
-      height: 1px;
-      background: linear-gradient(90deg, rgba(126, 169, 143, 0.8), transparent);
-    }
-    .control-row {
-      gap: 0.6rem;
-      align-items: center;
-    }
-    .btn-theme {
-      border: 1px solid rgba(126, 169, 143, 0.45);
-      color: #d8e6dc;
-      background: linear-gradient(180deg, #214738, #163429);
-      transition: all 280ms var(--ease-smooth);
-    }
-    .btn-theme:hover {
-      color: #eff7f2;
-      border-color: rgba(152, 199, 165, 0.8);
-      box-shadow: 0 0 0 0.18rem rgba(20, 92, 67, 0.22), 0 0 22px rgba(20, 92, 67, 0.35);
-      transform: scale(1.04);
-    }
-    .btn-undo {
-      border: 1px solid rgba(201, 130, 130, 0.45);
-      color: #e7d2cf;
-      background: linear-gradient(180deg, #5a1a1a, #3f1717);
-      transition: all 280ms var(--ease-smooth);
-    }
-    .btn-undo:hover {
-      color: #f3e3e0;
-      border-color: rgba(201, 130, 130, 0.92);
-      box-shadow: 0 0 0 0.18rem rgba(122, 31, 31, 0.2), 0 0 22px rgba(122, 31, 31, 0.34);
-      transform: scale(1.04);
-    }
-    #mode {
-      border-color: var(--bd2);
-      background: linear-gradient(180deg, #2d2521, #252220) !important;
-      color: var(--tx0) !important;
-      transition: border-color 260ms var(--ease-smooth), box-shadow 260ms var(--ease-smooth);
-    }
-    #mode:focus {
-      border-color: rgba(126, 169, 143, 0.85);
-      box-shadow: 0 0 0 0.18rem rgba(20, 92, 67, 0.22);
-    }
-    .board-grid {
+
+    #board {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: min(74vw, 520px);
+      max-width: 520px;
+      transform-style: preserve-3d;
+      transform:
+        translate3d(-50%, -50%, 38px)
+        rotateX(17deg)
+        rotateZ(calc(var(--tilt) * -0.8deg));
       display: grid;
       grid-template-columns: repeat(6, 1fr);
-      gap: 4px;
+      gap: 8px;
+      padding: 16px;
+      border-radius: 22px;
+      border: 1px solid rgba(176, 142, 123, 0.52);
       background:
-        linear-gradient(160deg, rgba(58, 42, 36, 0.95), rgba(30, 30, 30, 0.96)),
-        radial-gradient(circle at 20% 18%, rgba(20, 92, 67, 0.14), transparent 48%);
-      border: 1px solid var(--bd2);
-      border-radius: 12px;
-      padding: 8px;
-      width: min(100%, 440px);
-      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05), 0 0 30px rgba(0, 0, 0, 0.28);
+        linear-gradient(170deg, rgba(58, 42, 36, 0.94), rgba(42, 42, 42, 0.92)),
+        radial-gradient(circle at 20% 15%, rgba(20, 92, 67, 0.17), transparent 58%);
+      box-shadow:
+        0 22px 40px rgba(0, 0, 0, 0.55),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
     }
-    .cell {
-      border: 1px solid var(--bd);
-      border-radius: 9px;
-      background: linear-gradient(180deg, #3a2a24, #2b1f1a);
-      aspect-ratio: 1/1;
+
+    .slot {
+      position: relative;
+      aspect-ratio: 1 / 1;
+      border: 1px solid rgba(142, 115, 99, 0.54);
+      border-radius: 11px;
+      background: linear-gradient(180deg, rgba(58, 42, 36, 0.95), rgba(43, 31, 26, 0.95));
+      color: #d6ccc6;
+      font-size: clamp(0.98rem, 2.8vw, 1.5rem);
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      transform-style: preserve-3d;
+      transform:
+        translate3d(0, 0, calc(var(--force, 0) * 18px))
+        skewX(calc(var(--fx, 0) * 5deg))
+        skewY(calc(var(--fy, 0) * -5deg))
+        scale(calc(1 + var(--force, 0) * 0.08));
+      transition:
+        transform 170ms cubic-bezier(0.2, 0.7, 0.3, 1),
+        box-shadow 180ms ease,
+        border-color 180ms ease;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    }
+
+    .slot:hover {
+      border-color: rgba(182, 151, 133, 0.88);
+      box-shadow:
+        0 0 0 1px rgba(182, 151, 133, 0.36),
+        0 10px 18px rgba(0, 0, 0, 0.34);
+    }
+
+    .slot.unicorn {
+      color: #d7cabd;
+      background:
+        linear-gradient(180deg, rgba(78, 56, 46, 0.98), rgba(54, 41, 35, 0.98)),
+        radial-gradient(circle at 50% 12%, rgba(201, 160, 130, 0.24), transparent 58%);
+      border-color: rgba(190, 152, 126, 0.64);
+    }
+
+    .slot.horse {
+      color: #b8d4c6;
+      background:
+        linear-gradient(180deg, rgba(24, 62, 48, 0.97), rgba(15, 46, 35, 0.97)),
+        radial-gradient(circle at 50% 12%, rgba(121, 179, 151, 0.24), transparent 58%);
+      border-color: rgba(121, 179, 151, 0.66);
+    }
+
+    .slot.selected {
+      box-shadow:
+        0 0 0 2px rgba(121, 179, 151, 0.45),
+        0 0 20px rgba(20, 92, 67, 0.34);
+    }
+
+    .slot.valid {
+      border-color: rgba(159, 205, 173, 0.95);
+      box-shadow:
+        0 0 0 1px rgba(159, 205, 173, 0.5),
+        0 0 18px rgba(20, 92, 67, 0.38);
+    }
+
+    .slot.winning {
+      border-color: rgba(159, 205, 173, 0.95);
+      animation: winPulse 1s infinite;
+      box-shadow:
+        0 0 0 1px rgba(159, 205, 173, 0.5),
+        0 0 24px rgba(159, 205, 173, 0.52);
+    }
+
+    .slot .rc {
+      position: absolute;
+      bottom: 4px;
+      right: 5px;
+      font-size: 8px;
+      letter-spacing: 0.06em;
+      color: rgba(173, 155, 145, 0.62);
+      pointer-events: none;
+    }
+
+    #ui-overlay {
+      position: absolute;
+      right: clamp(10px, 2vw, 24px);
+      top: clamp(10px, 2vw, 24px);
+      z-index: 30;
+      display: grid;
+      gap: 8px;
+      width: min(320px, 44vw);
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(148, 122, 108, 0.46);
+      background: linear-gradient(170deg, rgba(26, 26, 26, 0.82), rgba(43, 31, 26, 0.74));
+      backdrop-filter: blur(8px);
+      box-shadow: 0 14px 38px rgba(0, 0, 0, 0.42);
+      transform: translateZ(40px) rotateZ(-1deg);
+    }
+
+    .hud-row {
       display: flex;
       align-items: center;
-      justify-content: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .hud-label {
+      font-size: 0.76rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--txt-soft);
+    }
+
+    .hud-select,
+    .hud-btn {
+      border: 1px solid rgba(150, 122, 108, 0.52);
+      background: linear-gradient(180deg, rgba(42, 42, 42, 0.95), rgba(43, 31, 26, 0.92));
+      color: var(--txt);
+      border-radius: 9px;
+      height: 34px;
+      padding: 0 10px;
+      font-size: 0.84rem;
+      transition: transform 180ms ease, box-shadow 200ms ease, border-color 200ms ease;
+    }
+
+    .hud-btn {
+      cursor: pointer;
+    }
+
+    .hud-btn:hover {
+      transform: scale(1.04);
+      border-color: rgba(121, 179, 151, 0.85);
+      box-shadow: 0 0 16px rgba(20, 92, 67, 0.38);
+    }
+
+    .hud-btn.alert:hover {
+      border-color: rgba(201, 130, 130, 0.86);
+      box-shadow: 0 0 16px rgba(122, 31, 31, 0.34);
+    }
+
+    .hud-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    #info-layer {
       position: relative;
-      font-size: clamp(1rem, 3vw, 1.5rem);
-      transition: transform 260ms var(--ease-smooth), box-shadow 300ms var(--ease-smooth), border-color 260ms var(--ease-smooth);
-      will-change: transform;
+      min-height: 560px;
+      padding: 16px 14px;
+      border-radius: 19px;
+      border: 1px solid rgba(148, 122, 108, 0.4);
+      background:
+        linear-gradient(165deg, rgba(30, 30, 30, 0.9), rgba(43, 31, 26, 0.82)),
+        radial-gradient(circle at 80% 10%, rgba(122, 31, 31, 0.18), transparent 42%);
+      box-shadow: var(--shadow);
+      transform: translate3d(0, 0, 24px) rotateZ(0.9deg);
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      gap: 10px;
     }
-    .cell:hover {
-      transform: translateY(-2px) scale(1.02);
-      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.26);
+
+    #status {
+      font-size: 0.95rem;
+      line-height: 1.45;
+      color: var(--txt-soft);
+      min-height: 54px;
     }
-    .cell.uni {
-      background: linear-gradient(180deg, #4a3831, #342924);
-      border-color: rgba(201, 162, 137, 0.65);
-      box-shadow: inset 0 0 16px rgba(206, 181, 158, 0.18);
+
+    #status .u { color: #d3bba3; }
+    #status .h { color: #8ab89f; }
+    #status .ok { color: #9ac9ae; }
+    #status .warn { color: #c98282; }
+
+    #legend {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      font-size: 0.72rem;
+      color: var(--txt-soft);
     }
-    .cell.hor {
-      background: linear-gradient(180deg, #1f3f33, #173128);
-      border-color: rgba(121, 179, 151, 0.68);
-      box-shadow: inset 0 0 16px rgba(121, 179, 151, 0.22);
+
+    #legend span {
+      border: 1px solid rgba(148, 122, 108, 0.44);
+      border-radius: 999px;
+      padding: 4px 8px;
+      background: rgba(42, 42, 42, 0.7);
     }
-    .cell.select {
-      outline: 2px dashed var(--acc);
-      outline-offset: -3px;
-      box-shadow: 0 0 0 3px rgba(126, 169, 143, 0.22), 0 0 20px rgba(126, 169, 143, 0.24);
-    }
-    .cell.valid {
-      border-color: var(--ok);
-      box-shadow: inset 0 0 0 1px rgba(152, 199, 165, 0.45), 0 0 14px rgba(20, 92, 67, 0.32);
-    }
-    .cell.win {
-      border-color: var(--win);
-      box-shadow: inset 0 0 0 1px rgba(159, 205, 173, 0.55), 0 0 24px rgba(159, 205, 173, 0.45);
-      animation: pulse 1s infinite;
-    }
-    .coord {
-      position: absolute;
-      right: 5px;
-      bottom: 2px;
-      font-size: 9px;
-      color: var(--tx2);
-    }
-    .history {
-      max-height: 360px;
+
+    #history {
+      margin: 0;
+      padding-left: 18px;
       overflow: auto;
-      color: var(--tx1);
-      line-height: 1.6;
-      margin-bottom: 0;
+      max-height: 430px;
+      color: #b6a69c;
+      line-height: 1.55;
+      font-size: 0.9rem;
     }
-    .history li { transition: color 220ms var(--ease-smooth); }
-    .history li:hover { color: var(--tx0); }
-    .history::-webkit-scrollbar { width: 8px; }
-    .history::-webkit-scrollbar-thumb {
-      background: linear-gradient(180deg, #4f3a34, #2a2421);
+
+    #history li strong { color: #dfd5ce; }
+
+    #history::-webkit-scrollbar { width: 8px; }
+    #history::-webkit-scrollbar-thumb {
       border-radius: 8px;
+      background: linear-gradient(180deg, #5a1a1a, #145c43);
     }
-    .status .u { color: var(--uni); }
-    .status .h { color: var(--hor); }
-    .status .ok { color: var(--ok); }
-    .status .warn { color: var(--danger); }
-    .reveal {
-      opacity: 0;
-      transform: translateY(16px);
-      transition: opacity 650ms var(--ease-smooth), transform 650ms var(--ease-smooth);
+
+    #hint {
+      margin: 0;
+      font-size: 0.78rem;
+      color: #968880;
+      line-height: 1.5;
+      border-top: 1px dashed rgba(148, 122, 108, 0.3);
+      padding-top: 8px;
     }
-    .reveal.in {
-      opacity: 1;
-      transform: translateY(0);
+
+    @keyframes winPulse {
+      0%, 100% { transform: translate3d(0, 0, calc(var(--force, 0) * 18px)) scale(1); }
+      50% { transform: translate3d(0, -2px, calc(var(--force, 0) * 24px)) scale(1.035); }
     }
-    .layout-shell {
-      transform: translate3d(calc(var(--mx) * 6px), calc(var(--my) * 4px), 0);
-    }
-    .arena-card {
-      transform: translateY(12px) rotate(-0.35deg);
-    }
-    .history-card {
-      transform: translateY(-6px) rotate(0.25deg);
-    }
-    .hero-card {
-      clip-path: polygon(0 0, 100% 0, 100% 86%, 95% 100%, 0 100%);
-    }
-    .control-card {
-      clip-path: polygon(0 0, 97% 0, 100% 100%, 0 100%);
-    }
-    @keyframes pulse {
-      0% { transform: scale(1); }
-      50% { transform: scale(1.022); filter: brightness(1.15); }
-      100% { transform: scale(1); }
-    }
-    @keyframes auroraShift {
-      0% { transform: translate3d(0, 0, 0) scale(1); }
-      100% { transform: translate3d(0, -14px, 0) scale(1.03); }
-    }
-    @keyframes blobFloat {
-      0% { transform: translate3d(0, 0, 0) scale(1); }
-      100% { transform: translate3d(12px, -18px, 0) scale(1.07); }
-    }
-    @keyframes titlePulse {
-      0%, 100% { letter-spacing: 0.08em; filter: brightness(1); }
-      50% { letter-spacing: 0.11em; filter: brightness(1.12); }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      .fx-aurora, .blob, .cell.win {
-        animation: none !important;
+
+    @media (max-width: 980px) {
+      #stage {
+        grid-template-columns: 1fr;
+        gap: 12px;
       }
-      .reveal {
-        opacity: 1;
+      #board-3d { min-height: 500px; }
+      #ui-overlay {
+        position: static;
+        width: 100%;
+        margin-bottom: 10px;
+        transform: translateZ(0);
+      }
+      #board {
+        width: min(86vw, 520px);
+      }
+      #info-layer {
+        min-height: 300px;
         transform: none;
+      }
+      #brand-title {
+        font-size: clamp(1.3rem, 9vw, 2.2rem);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        animation: none !important;
+        transition: none !important;
+      }
+      #stage,
+      #board,
+      #brand-title {
+        transform: none !important;
       }
     }
   </style>
 </head>
 <body>
-  <canvas id="fx-nebula"></canvas>
-  <canvas id="fx-particles"></canvas>
-  <div class="fx-noise"></div>
-  <div class="fx-blobs">
-    <div class="blob green"></div>
-    <div class="blob red"></div>
+  <canvas id="bg-system"></canvas>
+
+  <div id="arena">
+    <h1 id="brand-title">Matunga</h1>
+
+    <section id="stage">
+      <div id="board-3d">
+        <div id="ui-overlay">
+          <div class="hud-row">
+            <span class="hud-label">Modo</span>
+            <select id="mode" class="hud-select">
+              <option value="pvp">🧑 vs 🧑</option>
+              <option value="pvb-easy">🧑 vs 🤖 (fácil)</option>
+              <option value="pvb-medium">🧑 vs 🤖 (médio)</option>
+              <option value="pvb-hard">🧑 vs 🤖 (difícil)</option>
+              <option value="bvb">🤖 vs 🤖</option>
+            </select>
+          </div>
+          <div class="hud-row">
+            <button id="new-game" class="hud-btn">Novo Jogo</button>
+            <button id="undo" class="hud-btn alert">Desfazer 1×</button>
+          </div>
+        </div>
+        <div id="board" aria-label="Tabuleiro Matunga"></div>
+      </div>
+
+      <aside id="info-layer">
+        <div id="status"></div>
+        <div id="legend">
+          <span>6×6</span>
+          <span>Sem captura</span>
+          <span>Vitória em L</span>
+          <span>Força no hover</span>
+        </div>
+        <ol id="history"></ol>
+        <p id="hint">Passe o cursor pelo tabuleiro para ativar o campo de força visual. Clique em uma peça sua e depois no destino válido.</p>
+      </aside>
+    </section>
   </div>
-  <div class="fx-aurora"></div>
-  <main class="container py-4 py-md-5">
-    <section class="glass hero-card p-3 p-md-4 mb-3 reveal parallax" data-depth="0.03">
-      <div class="section-title">Experiência Tática</div>
-      <h1 class="h2 fw-bold mb-1">Matunga</h1>
-      <p class="text-soft hero-sub mb-3">Tabuleiro 6×6, movimento de cavalo e vitória por L‑tetromino em uma atmosfera tática, sombria e cinematográfica.</p>
-      <div class="d-flex flex-wrap gap-2">
-        <span class="badge rounded-pill badge-soft">🦄 começa</span>
-        <span class="badge rounded-pill badge-soft">sem captura</span>
-        <span class="badge rounded-pill badge-soft">destino vazio obrigatório</span>
-        <span class="badge rounded-pill badge-soft">undo 1×</span>
-      </div>
-    </section>
 
-    <section class="glass control-card p-3 p-md-4 mb-3 reveal parallax" data-depth="0.018">
-      <div class="section-title">Controles</div>
-      <div class="d-flex flex-wrap control-row align-items-center">
-        <label for="mode" class="mb-0">Modo:</label>
-        <select id="mode" class="form-select form-select-sm w-auto">
-          <option value="pvp">🧑 vs 🧑</option>
-          <option value="pvb-easy">🧑 vs 🤖 (fácil)</option>
-          <option value="pvb-medium">🧑 vs 🤖 (médio)</option>
-          <option value="pvb-hard">🧑 vs 🤖 (difícil)</option>
-          <option value="bvb">🤖 vs 🤖</option>
-        </select>
-        <button id="new-game" class="btn btn-sm btn-theme">Novo jogo</button>
-        <button id="undo" class="btn btn-sm btn-undo">Desfazer (1×)</button>
-      </div>
-      <div id="status" class="status mt-3 text-soft"></div>
-    </section>
-
-    <section class="row g-3 layout-shell">
-      <div class="col-12 col-lg-5 reveal parallax" data-depth="0.04">
-        <div class="glass arena-card p-2 p-md-3">
-          <div class="section-title">Arena</div>
-          <div id="board" class="board-grid"></div>
-        </div>
-      </div>
-      <div class="col-12 col-lg-7 reveal parallax" data-depth="0.012">
-        <div class="glass history-card p-3 p-md-4 h-100">
-          <div class="section-title">Registro de Jogadas</div>
-          <h2 class="h6 text-uppercase text-soft mb-3">Histórico</h2>
-          <ol id="history" class="history"></ol>
-          <p class="small text-soft mt-3 mb-0">Clique numa peça sua para ver destinos válidos e clique no destino para mover.</p>
-        </div>
-      </div>
-    </section>
-  </main>
   <script src="./matunga.js"></script>
 </body>
 </html>
