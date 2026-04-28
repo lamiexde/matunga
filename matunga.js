@@ -477,6 +477,69 @@ function render() {
   renderStatus();
 }
 
+function initVisualEffects() {
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const revealItems = document.querySelectorAll(".reveal");
+  if (!reduceMotion && "IntersectionObserver" in window) {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("in");
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.16 }
+    );
+    revealItems.forEach((el) => observer.observe(el));
+  } else {
+    revealItems.forEach((el) => el.classList.add("in"));
+  }
+
+  if (reduceMotion) return;
+
+  const parallaxEls = [...document.querySelectorAll(".parallax")];
+  const auroraEl = document.querySelector(".fx-aurora");
+  let raf = 0;
+
+  function updateParallax(mx, my, sy) {
+    parallaxEls.forEach((el) => {
+      const depth = Number(el.getAttribute("data-depth") || "0");
+      const tx = mx * depth * 18;
+      const ty = my * depth * 14 - sy * depth * 0.18;
+      el.style.transform = `translate3d(${tx.toFixed(2)}px, ${ty.toFixed(2)}px, 0)`;
+    });
+    if (auroraEl) {
+      auroraEl.style.transform = `translate3d(${(mx * -8).toFixed(2)}px, ${(my * -6 - sy * 0.03).toFixed(2)}px, 0)`;
+    }
+  }
+
+  let mouseX = 0;
+  let mouseY = 0;
+  let scrollY = window.scrollY;
+
+  function schedule() {
+    if (raf) return;
+    raf = requestAnimationFrame(() => {
+      raf = 0;
+      updateParallax(mouseX, mouseY, scrollY);
+    });
+  }
+
+  window.addEventListener("mousemove", (event) => {
+    mouseX = event.clientX / window.innerWidth - 0.5;
+    mouseY = event.clientY / window.innerHeight - 0.5;
+    schedule();
+  });
+
+  window.addEventListener("scroll", () => {
+    scrollY = window.scrollY;
+    schedule();
+  }, { passive: true });
+}
+
 function initParticles() {
   const canvas = document.getElementById("fx-particles");
   if (!(canvas instanceof HTMLCanvasElement)) return;
@@ -491,16 +554,16 @@ function initParticles() {
   let particles = [];
 
   function createParticle() {
-    const warm = Math.random() < 0.62;
-    const baseHue = warm ? 42 : 108;
+    const green = Math.random() < 0.58;
+    const baseHue = green ? 154 : 2;
     return {
       x: Math.random() * width,
       y: Math.random() * height,
-      vx: (Math.random() - 0.5) * (warm ? 0.32 : 0.26),
-      vy: (Math.random() - 0.5) * (warm ? 0.32 : 0.26),
-      radius: Math.random() * 2.2 + 0.8,
-      alpha: Math.random() * 0.45 + 0.18,
-      hue: baseHue + (Math.random() * 16 - 8),
+      vx: (Math.random() - 0.5) * (green ? 0.18 : 0.14),
+      vy: (Math.random() - 0.5) * (green ? 0.16 : 0.12),
+      radius: Math.random() * 1.8 + 0.6,
+      alpha: Math.random() * 0.28 + 0.08,
+      hue: baseHue + (Math.random() * 14 - 7),
     };
   }
 
@@ -513,12 +576,13 @@ function initParticles() {
     canvas.style.height = `${height}px`;
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 
-    const count = Math.max(50, Math.min(140, Math.floor((width * height) / 17000)));
+    const count = Math.max(44, Math.min(110, Math.floor((width * height) / 22000)));
     particles = Array.from({ length: count }, createParticle);
   }
 
   function step() {
-    ctx.clearRect(0, 0, width, height);
+    ctx.fillStyle = "rgba(20, 18, 18, 0.2)";
+    ctx.fillRect(0, 0, width, height);
 
     for (const p of particles) {
       p.x += p.vx;
@@ -529,12 +593,12 @@ function initParticles() {
       if (p.y < -20) p.y = height + 20;
       if (p.y > height + 20) p.y = -20;
 
-      const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.radius * 7);
-      grad.addColorStop(0, `hsla(${p.hue}, 90%, 68%, ${p.alpha})`);
+      const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.radius * 8);
+      grad.addColorStop(0, `hsla(${p.hue}, 56%, 62%, ${p.alpha})`);
       grad.addColorStop(1, `hsla(${p.hue}, 90%, 68%, 0)`);
       ctx.fillStyle = grad;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, p.radius * 7, 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, p.radius * 8, 0, Math.PI * 2);
       ctx.fill();
     }
 
@@ -545,9 +609,9 @@ function initParticles() {
         const dx = a.x - b.x;
         const dy = a.y - b.y;
         const dist = Math.hypot(dx, dy);
-        if (dist > 118) continue;
-        const opacity = (1 - dist / 118) * 0.12;
-        ctx.strokeStyle = `rgba(238, 214, 150, ${opacity})`;
+        if (dist > 110) continue;
+        const opacity = (1 - dist / 110) * 0.06;
+        ctx.strokeStyle = `rgba(173, 188, 176, ${opacity})`;
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(a.x, a.y);
@@ -596,5 +660,6 @@ undoBtn.addEventListener("click", () => {
   scheduleBotTurn();
 });
 
+initVisualEffects();
 initParticles();
 startGame();
