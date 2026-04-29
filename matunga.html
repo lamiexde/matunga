@@ -6,83 +6,86 @@
   <title>Matunga</title>
   <style>
     :root {
-      --bg-low-0: #0b0b0a;
-      --bg-low-1: #241814;
-      --green: #1f8f5f;
-      --red: #6e1717;
+      --c-black: #0b0b0a;
+      --c-brown: #241814;
+      --c-green: #1f8f5f;
+      --c-red: #6e1717;
       --ui-0: #171615;
       --ui-1: #241814;
       --ui-2: #34231d;
       --ui-3: #6f5038;
-      --txt: #e6d6bd;
+      --txt-main: #e6d6bd;
       --txt-soft: #b8a48c;
       --a: #d59b45;
       --b: #69d49a;
-      --time-fast: 160ms;
-      --time-mid: 220ms;
     }
 
     * { box-sizing: border-box; }
-
     html, body {
       margin: 0;
       min-height: 100%;
-      color: var(--txt);
+      color: var(--txt-main);
+      font-family: Inter, system-ui, -apple-system, sans-serif;
       background:
-        radial-gradient(circle at 18% 12%, rgba(31, 143, 95, 0.10), transparent 42%),
-        radial-gradient(circle at 82% 10%, rgba(110, 23, 23, 0.10), transparent 38%),
-        linear-gradient(155deg, #0f0e0d 0%, #171312 42%, #1b1310 100%);
-      background-image:
-        radial-gradient(circle at 18% 12%, rgba(31, 143, 95, 0.10), transparent 42%),
-        radial-gradient(circle at 82% 10%, rgba(110, 23, 23, 0.10), transparent 38%),
-        linear-gradient(155deg, #0f0e0d 0%, #171312 42%, #1b1310 100%),
+        radial-gradient(circle at 16% 12%, rgba(31, 143, 95, 0.12), transparent 42%),
+        radial-gradient(circle at 84% 10%, rgba(110, 23, 23, 0.12), transparent 40%),
+        linear-gradient(145deg, #0d0d0c 0%, #131110 42%, #170f0d 100%),
         radial-gradient(circle, rgba(255, 255, 255, 0.03) 0.6px, transparent 0.8px);
       background-size: auto, auto, auto, 6px 6px;
-      font-family: "Inter", system-ui, -apple-system, sans-serif;
       overflow-x: hidden;
     }
 
-    #bg {
+    #bg, #crt {
       position: fixed;
       inset: 0;
-      z-index: 0;
       pointer-events: none;
-      opacity: 0.52;
+    }
+    #bg { z-index: 0; opacity: 0.68; }
+    #crt {
+      z-index: 2;
+      opacity: 0.11;
+      background-image: repeating-linear-gradient(
+        to bottom,
+        rgba(0, 0, 0, 0.18) 0px,
+        rgba(0, 0, 0, 0.18) 1px,
+        transparent 2px
+      );
+      mix-blend-mode: multiply;
     }
 
     #root {
       position: relative;
-      z-index: 1;
+      z-index: 3;
       min-height: 100vh;
       display: grid;
       grid-template-columns: 1fr auto;
       grid-template-rows: auto 1fr;
       gap: 14px;
-      padding: clamp(14px, 2.2vw, 24px);
+      padding: clamp(12px, 2.2vw, 24px);
     }
 
     #title {
       grid-column: 1 / -1;
       grid-row: 1;
       margin: 0;
-      font-family: "Georgia", "Times New Roman", serif;
-      letter-spacing: 0.1em;
-      color: var(--txt);
-      font-size: clamp(1.45rem, 2.8vw, 2.45rem);
-      line-height: 1.08;
-      position: relative;
       width: fit-content;
-      user-select: none;
+      position: relative;
+      font-family: Georgia, "Times New Roman", serif;
+      letter-spacing: 0.1em;
+      font-size: clamp(1.45rem, 2.8vw, 2.4rem);
       text-transform: uppercase;
+      color: var(--txt-main);
+      user-select: none;
+      transform: translate(var(--tx, 0px), var(--ty, 0px));
+      transition: transform 80ms linear;
     }
-
     #title::after {
       content: attr(data-text);
       position: absolute;
       inset: 0;
       transform: translate(2px, 1px);
-      color: #6e1717;
-      opacity: 0.24;
+      color: var(--c-red);
+      opacity: 0.26;
       pointer-events: none;
     }
 
@@ -91,7 +94,8 @@
       grid-row: 2;
       display: grid;
       place-items: center;
-      min-height: min(740px, 80vh);
+      min-height: min(760px, 82vh);
+      position: relative;
     }
 
     #board {
@@ -103,52 +107,63 @@
       padding: 8px;
       background: #171615;
       border: 1px solid #6f5038;
-      border-radius: 10px;
-      box-shadow: 0 18px 34px rgba(0, 0, 0, 0.34);
+      border-radius: 9px;
+      box-shadow: 0 14px 34px rgba(0, 0, 0, 0.34);
+      position: relative;
+      z-index: 1;
+    }
+
+    #fx-board {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
     }
 
     .cell {
       position: relative;
+      aspect-ratio: 1 / 1;
       display: grid;
       place-items: center;
-      aspect-ratio: 1 / 1;
-      border: 1px solid #34231d;
       background: #241814;
-      color: #d8cfc8;
+      border: 1px solid #34231d;
+      color: #ddd1c8;
       font-size: clamp(1rem, 2.8vw, 1.42rem);
       cursor: pointer;
+      --ray: 0;
       transition:
-        transform var(--time-fast) ease,
-        box-shadow var(--time-fast) ease,
-        border-color var(--time-fast) ease,
-        opacity var(--time-fast) ease;
-      will-change: transform;
+        transform 140ms ease,
+        border-color 140ms ease,
+        box-shadow 160ms ease,
+        opacity 160ms ease;
+      box-shadow:
+        0 0 calc(var(--ray) * 14px) rgba(184, 164, 140, calc(var(--ray) * 0.28)),
+        0 0 calc(var(--ray) * 22px) rgba(31, 143, 95, calc(var(--ray) * 0.18));
     }
-
     .cell:hover {
       transform: translateY(-1px);
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+      box-shadow:
+        0 4px 10px rgba(0, 0, 0, 0.3),
+        0 0 calc(var(--ray) * 18px) rgba(184, 164, 140, calc(var(--ray) * 0.34));
     }
 
     .cell::before {
       content: "";
       position: absolute;
-      inset: 19%;
+      inset: 18%;
       border-radius: 50%;
       opacity: 0;
-      transition: opacity var(--time-mid) ease, filter var(--time-mid) ease;
       filter: blur(6px);
       pointer-events: none;
+      transition: opacity 220ms ease;
     }
-
-    .cell.piece-a::before {
+    .cell.a::before {
       background: rgba(213, 155, 69, 0.52);
-      opacity: 0.55;
+      opacity: 0.58;
     }
-
-    .cell.piece-b::before {
+    .cell.b::before {
       background: rgba(31, 143, 95, 0.52);
-      opacity: 0.55;
+      opacity: 0.58;
     }
 
     .cell.selected {
@@ -156,107 +171,81 @@
       outline-offset: -2px;
       animation: selectedPulse 1.1s ease-in-out infinite;
     }
-
     .cell.valid::after {
       content: "";
       width: 11px;
       height: 11px;
       background: #b8a48c;
       transform: rotate(45deg);
-      opacity: 0.85;
       border-radius: 1px;
-      box-shadow: 0 0 6px rgba(184, 164, 140, 0.3);
-      pointer-events: none;
+      box-shadow: 0 0 6px rgba(184, 164, 140, 0.26);
     }
-
     .cell.win {
       border: 2px solid var(--win-color, #d59b45);
-      animation: winGlow 700ms ease-in-out infinite alternate;
+      animation: winGlow 760ms ease-in-out infinite alternate;
     }
-
-    .cell.move-from {
-      transform: scale(0.95);
-      opacity: 0.74;
-    }
-
-    .cell.move-to {
-      transform: scale(1.06);
-      box-shadow: 0 0 0 1px rgba(230, 214, 189, 0.25), 0 6px 14px rgba(0, 0, 0, 0.34);
-    }
+    .cell.m-from { transform: scale(0.95); opacity: 0.74; }
+    .cell.m-to { transform: scale(1.05); }
 
     .coord {
       position: absolute;
       right: 3px;
       bottom: 2px;
       font-size: 8px;
-      color: #73625a;
+      color: #76645b;
       pointer-events: none;
     }
 
     #hud {
       grid-column: 2;
       grid-row: 2;
-      width: min(330px, 94vw);
+      width: min(332px, 95vw);
       display: grid;
       grid-template-rows: auto auto 1fr;
       gap: 10px;
       align-content: start;
     }
 
-    #controls,
-    #status,
-    #history {
+    #controls, #status, #history {
       background: #171615;
       border: 1px solid #34231d;
       border-radius: 8px;
     }
-
     #controls {
       padding: 10px;
       display: grid;
       gap: 8px;
     }
-
     #controls .row {
       display: flex;
       gap: 8px;
       flex-wrap: wrap;
       align-items: center;
     }
-
     #controls label {
-      font-size: 0.76rem;
-      color: #b8a48c;
+      font-size: 0.75rem;
+      color: var(--txt-soft);
       letter-spacing: 0.08em;
       text-transform: uppercase;
     }
-
     select, button {
       height: 34px;
       background: #241814;
       border: 1px solid #6f5038;
-      color: #e6d6bd;
+      color: var(--txt-main);
       border-radius: 6px;
       font-size: 0.86rem;
       padding: 0 10px;
-      transition: border-color var(--time-fast) ease, box-shadow var(--time-fast) ease, transform var(--time-fast) ease;
+      transition: border-color 150ms ease, box-shadow 150ms ease, transform 120ms ease;
     }
-
-    button {
-      cursor: pointer;
-    }
-
+    button { cursor: pointer; }
     button:hover {
       border-color: #d59b45;
       box-shadow: 0 0 8px rgba(213, 155, 69, 0.24);
     }
-
-    button:active {
-      transform: scale(0.97);
-    }
-
+    button:active { transform: scale(0.97); }
     button:disabled {
-      opacity: 0.45;
+      opacity: 0.44;
       cursor: not-allowed;
       transform: none;
       box-shadow: none;
@@ -264,24 +253,22 @@
 
     #status {
       padding: 10px;
-      font-family: "Georgia", "Times New Roman", serif;
+      min-height: 70px;
+      font-family: Georgia, "Times New Roman", serif;
       font-size: 0.94rem;
-      line-height: 1.42;
-      color: #b8a48c;
-      min-height: 72px;
+      line-height: 1.44;
+      color: var(--txt-soft);
     }
-
-    #status .a { color: #d59b45; }
-    #status .b { color: #69d49a; }
-    #status .warn { color: #c18080; }
+    #status .a { color: var(--a); }
+    #status .b { color: var(--b); }
+    #status .warn { color: #c38080; }
 
     #history {
-      padding: 10px 8px 10px 12px;
-      min-height: 180px;
-      max-height: min(58vh, 420px);
+      min-height: 170px;
+      max-height: min(58vh, 430px);
       overflow: auto;
+      padding: 10px 8px 10px 12px;
     }
-
     #history ol {
       margin: 0;
       padding-left: 18px;
@@ -289,15 +276,8 @@
       font-size: 0.82rem;
       line-height: 1.58;
     }
-
-    #history li.latest {
-      color: #e6d6bd;
-    }
-
-    #history strong {
-      color: #d7c4a8;
-    }
-
+    #history li.latest { color: #e6d6bd; }
+    #history strong { color: #d8c6ad; }
     #history::-webkit-scrollbar { width: 8px; }
     #history::-webkit-scrollbar-thumb {
       background: linear-gradient(180deg, #6f5038, #34231d);
@@ -308,10 +288,9 @@
       0%, 100% { opacity: 1; }
       50% { opacity: 0.62; }
     }
-
     @keyframes winGlow {
       from { box-shadow: 0 0 0 rgba(0, 0, 0, 0); }
-      to { box-shadow: 0 0 14px rgba(213, 155, 69, 0.38); }
+      to { box-shadow: 0 0 14px rgba(213, 155, 69, 0.4); }
     }
 
     @media (max-width: 980px) {
@@ -328,14 +307,14 @@
 </head>
 <body>
   <canvas id="bg"></canvas>
+  <div id="crt"></div>
 
   <div id="root">
     <header id="title" data-text="MATUNGA">MATUNGA</header>
-
     <section id="arena">
-      <div id="board" aria-label="Tabuleiro Matunga"></div>
+      <div id="board"></div>
+      <canvas id="fx-board"></canvas>
     </section>
-
     <aside id="hud">
       <div id="controls">
         <div class="row">

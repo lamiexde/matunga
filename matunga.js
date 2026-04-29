@@ -33,9 +33,16 @@ const modeEl = document.getElementById("mode");
 const newGameBtn = document.getElementById("new-game");
 const undoBtn = document.getElementById("undo");
 const bgCanvas = document.getElementById("bg");
+const fxBoardCanvas = document.getElementById("fx-board");
+const arenaEl = document.getElementById("arena");
+const titleEl = document.getElementById("title");
+const crtEl = document.getElementById("crt");
 
-if (!boardEl || !statusEl || !historyWrapEl || !modeEl || !newGameBtn || !undoBtn || !(bgCanvas instanceof HTMLCanvasElement)) {
-  throw new Error("Elementos obrigatórios da interface não encontrados.");
+if (
+  !boardEl || !statusEl || !historyWrapEl || !modeEl || !newGameBtn || !undoBtn || !arenaEl || !titleEl || !crtEl ||
+  !(bgCanvas instanceof HTMLCanvasElement) || !(fxBoardCanvas instanceof HTMLCanvasElement)
+) {
+  throw new Error("Estrutura de interface incompleta.");
 }
 
 const state = {
@@ -52,20 +59,60 @@ const state = {
   snapshotBeforeMove: null,
   botTimer: null,
   info: "",
-  lastMove: null,
-  lastMoveAt: 0,
+  hoverCell: null,
+  animMove: null, // {piece, from,to,x,y,tx,ty}
+  animFromBot: false,
 };
 
-const bgState = {
+const renderState = {
   mouseX: 0,
   mouseY: 0,
-  targetOffsetX: 0,
-  targetOffsetY: 0,
-  offsetX: 0,
-  offsetY: 0,
   scrollTarget: 0,
-  scrollValue: 0,
+  scrollSmooth: 0,
+  noiseT: 0,
+  waveT: 0,
+  flicker: 0.11,
+  fire: null,
+  particles: [],
+  trails: [],
+  boardRect: null,
 };
+
+const BAYER_4X4 = [
+  [0, 8, 2, 10],
+  [12, 4, 14, 6],
+  [3, 11, 1, 9],
+  [15, 7, 13, 5],
+];
+
+const FIRE_PALETTE = buildPalette();
+let cellRefs = [];
+let lastTime = performance.now();
+
+function buildPalette() {
+  const c0 = [11, 11, 10];
+  const c1 = [110, 23, 23];
+  const c2 = [213, 155, 69];
+  const out = [];
+  for (let i = 0; i <= 36; i++) {
+    if (i <= 18) {
+      const t = i / 18;
+      out.push([
+        Math.round(c0[0] + (c1[0] - c0[0]) * t),
+        Math.round(c0[1] + (c1[1] - c0[1]) * t),
+        Math.round(c0[2] + (c1[2] - c0[2]) * t),
+      ]);
+    } else {
+      const t = (i - 18) / 18;
+      out.push([
+        Math.round(c1[0] + (c2[0] - c1[0]) * t),
+        Math.round(c1[1] + (c2[1] - c1[1]) * t),
+        Math.round(c1[2] + (c2[2] - c1[2]) * t),
+      ]);
+    }
+  }
+  return out;
+}
 
 function other(player) {
   return player === U ? H : U;
@@ -73,6 +120,10 @@ function other(player) {
 
 function inBounds(r, c) {
   return r >= 0 && r < SIZE && c >= 0 && c < SIZE;
+}
+
+function clamp(v, min, max) {
+  return Math.max(min, Math.min(max, v));
 }
 
 function cloneBoard(board) {
@@ -138,7 +189,6 @@ function checkWin(board, player) {
       }
     }
   }
-
   for (const [r, c] of pieces) {
     for (const shape of L_SHAPES) {
       const coords = shape.map(([dr, dc]) => [r + dr, c + dc]);
@@ -226,13 +276,11 @@ function boardKey(board, turn, depth) {
 function minimax(board, depth, alpha, beta, turn, me, cache) {
   const key = boardKey(board, turn, depth);
   if (cache.has(key)) return cache.get(key);
-
   if (depth === 0 || checkWin(board, me).won || checkWin(board, other(me)).won) {
     const leaf = { score: evaluate(board, me), move: null };
     cache.set(key, leaf);
     return leaf;
   }
-
   const moves = allMovesForPlayer(board, turn);
   if (!moves.length) {
     const oppMoves = allMovesForPlayer(board, other(turn));
@@ -243,7 +291,6 @@ function minimax(board, depth, alpha, beta, turn, me, cache) {
   const maximizing = turn === me;
   let bestScore = maximizing ? -Infinity : Infinity;
   let bestMove = null;
-
   const orderedMoves = moves
     .map((move) => ({ move, hint: evaluate(applyMove(board, move), me) }))
     .sort((a, b) => (maximizing ? b.hint - a.hint : a.hint - b.hint))
@@ -276,7 +323,6 @@ function minimax(board, depth, alpha, beta, turn, me, cache) {
 function chooseBotMove() {
   const moves = allMovesForPlayer(state.board, state.turn);
   if (!moves.length) return null;
-
   const depth = MODE_DEPTH[state.mode] || 1;
   if (depth <= 1) {
     let best = moves[0];
@@ -290,13 +336,12 @@ function chooseBotMove() {
     }
     return best;
   }
-
   const cache = new Map();
   return minimax(state.board, depth, -Infinity, Infinity, state.turn, state.turn, cache).move;
 }
 
 function isBotTurn() {
-  if (state.gameOver) return false;
+  if (state.gameOver || state.animMove) return false;
   if (state.mode === "bvb") return true;
   return state.mode.startsWith("pvb") && state.turn === H;
 }
@@ -331,16 +376,12 @@ function saveSnapshot() {
     selected: state.selected ? [...state.selected] : null,
     validTargets: state.validTargets.map(([r, c]) => [r, c]),
     history: state.history.map((item) =>
-      item.type === "move"
-        ? { ...item, move: { from: [...item.move.from], to: [...item.move.to] } }
-        : { ...item }
+      item.type === "move" ? { ...item, move: { from: [...item.move.from], to: [...item.move.to] } } : { ...item }
     ),
     gameOver: state.gameOver,
     winner: state.winner,
     winningCells: state.winningCells.map(([r, c]) => [r, c]),
     info: state.info,
-    lastMove: state.lastMove ? { from: [...state.lastMove.from], to: [...state.lastMove.to] } : null,
-    lastMoveAt: state.lastMoveAt,
   };
 }
 
@@ -350,16 +391,12 @@ function restoreSnapshot(snapshot) {
   state.selected = snapshot.selected ? [...snapshot.selected] : null;
   state.validTargets = snapshot.validTargets.map(([r, c]) => [r, c]);
   state.history = snapshot.history.map((item) =>
-    item.type === "move"
-      ? { ...item, move: { from: [...item.move.from], to: [...item.move.to] } }
-      : { ...item }
+    item.type === "move" ? { ...item, move: { from: [...item.move.from], to: [...item.move.to] } } : { ...item }
   );
   state.gameOver = snapshot.gameOver;
   state.winner = snapshot.winner;
   state.winningCells = snapshot.winningCells.map(([r, c]) => [r, c]);
   state.info = snapshot.info;
-  state.lastMove = snapshot.lastMove ? { from: [...snapshot.lastMove.from], to: [...snapshot.lastMove.to] } : null;
-  state.lastMoveAt = snapshot.lastMoveAt;
 }
 
 function applyPassLogic() {
@@ -376,19 +413,37 @@ function applyPassLogic() {
   state.info = "Jogo travado.";
 }
 
-function executeMove(move, fromBot = false) {
-  if (state.gameOver) return;
-  const [fr, fc] = move.from;
-  if (state.board[fr][fc] !== state.turn) return;
+function cellCenter(r, c) {
+  if (!renderState.boardRect) return { x: 0, y: 0 };
+  const rect = renderState.boardRect;
+  const cw = rect.width / SIZE;
+  const ch = rect.height / SIZE;
+  return { x: rect.left + cw * (c + 0.5), y: rect.top + ch * (r + 0.5) };
+}
 
-  saveSnapshot();
+function startMoveAnimation(move, piece, fromBot) {
+  const from = cellCenter(move.from[0], move.from[1]);
+  const to = cellCenter(move.to[0], move.to[1]);
+  state.animMove = {
+    piece,
+    from: [...move.from],
+    to: [...move.to],
+    x: from.x,
+    y: from.y,
+    tx: to.x,
+    ty: to.y,
+  };
+  state.animFromBot = fromBot;
+}
+
+function finalizeMove(move, fromBot) {
   state.board = applyMove(state.board, move);
   state.history.push({ type: "move", player: state.turn, move });
   state.selected = null;
   state.validTargets = [];
   state.info = fromBot ? "Jogada do bot concluída." : "";
-  state.lastMove = { from: [...move.from], to: [...move.to] };
-  state.lastMoveAt = performance.now();
+
+  addTrailForMove(move);
 
   const result = checkWin(state.board, state.turn);
   if (result.won) {
@@ -405,8 +460,18 @@ function executeMove(move, fromBot = false) {
   scheduleBotTurn();
 }
 
+function executeMove(move, fromBot = false) {
+  if (state.gameOver || state.animMove) return;
+  const [fr, fc] = move.from;
+  const piece = state.board[fr][fc];
+  if (piece !== state.turn) return;
+
+  saveSnapshot();
+  startMoveAnimation(move, piece, fromBot);
+}
+
 function onCellClick(r, c) {
-  if (state.gameOver || isBotTurn()) return;
+  if (state.gameOver || isBotTurn() || state.animMove) return;
   const piece = state.board[r][c];
 
   if (state.selected) {
@@ -426,47 +491,51 @@ function onCellClick(r, c) {
     state.validTargets = [];
     state.info = "";
   }
-
   renderBoard();
   renderStatus();
 }
 
 function renderBoard() {
   boardEl.innerHTML = "";
+  cellRefs = Array.from({ length: SIZE }, () => Array(SIZE).fill(null));
   const validSet = new Set(state.validTargets.map(([r, c]) => `${r},${c}`));
   const winSet = new Set(state.winningCells.map(([r, c]) => `${r},${c}`));
-  const moving = state.lastMove && performance.now() - state.lastMoveAt < 190 ? state.lastMove : null;
 
   for (let r = 0; r < SIZE; r++) {
     for (let c = 0; c < SIZE; c++) {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "cell";
-      const piece = state.board[r][c];
+      button.dataset.r = String(r);
+      button.dataset.c = String(c);
+      let piece = state.board[r][c];
 
-      if (piece === U) button.classList.add("piece-a");
-      if (piece === H) button.classList.add("piece-b");
+      if (state.animMove && state.animMove.from[0] === r && state.animMove.from[1] === c) {
+        piece = "";
+      }
+
+      if (piece === U) button.classList.add("a");
+      if (piece === H) button.classList.add("b");
       if (state.selected && state.selected[0] === r && state.selected[1] === c) button.classList.add("selected");
       if (validSet.has(`${r},${c}`)) button.classList.add("valid");
       if (winSet.has(`${r},${c}`)) {
         button.classList.add("win");
         button.style.setProperty("--win-color", state.winner === U ? "#d59b45" : "#69d49a");
       }
-      if (moving) {
-        if (moving.from[0] === r && moving.from[1] === c) button.classList.add("move-from");
-        if (moving.to[0] === r && moving.to[1] === c) button.classList.add("move-to");
-      }
 
       button.textContent = piece === U ? "🦄" : piece === H ? "🐴" : "";
       button.addEventListener("click", () => onCellClick(r, c));
+      button.addEventListener("mouseenter", () => { state.hoverCell = [r, c]; });
 
       const coord = document.createElement("span");
       coord.className = "coord";
       coord.textContent = `${r},${c}`;
       button.appendChild(coord);
       boardEl.appendChild(button);
+      cellRefs[r][c] = button;
     }
   }
+  boardEl.addEventListener("mouseleave", () => { state.hoverCell = null; }, { once: true });
 }
 
 function renderHistory() {
@@ -495,7 +564,6 @@ function renderStatus() {
     }
     return;
   }
-
   const cls = state.turn === U ? "a" : "b";
   const bot = isBotTurn() ? " (pensando...)" : "";
   const info = state.info ? `<br>${state.info}` : "";
@@ -503,7 +571,7 @@ function renderStatus() {
 }
 
 function render() {
-  undoBtn.disabled = state.undoUsed || !state.snapshotBeforeMove;
+  undoBtn.disabled = state.undoUsed || !state.snapshotBeforeMove || !!state.animMove;
   renderBoard();
   renderHistory();
   renderStatus();
@@ -523,143 +591,356 @@ function startGame() {
   state.undoUsed = false;
   state.snapshotBeforeMove = null;
   state.info = "";
-  state.lastMove = null;
-  state.lastMoveAt = 0;
+  state.hoverCell = null;
+  state.animMove = null;
+  state.animFromBot = false;
+  renderState.trails = [];
   applyPassLogic();
   render();
   scheduleBotTurn();
 }
 
-function initBackground() {
-  const ctx = bgCanvas.getContext("2d", { alpha: true });
-  if (!ctx) return;
-
-  let width = 0;
-  let height = 0;
-  let dpr = 1;
-
-  const lerp = (a, b, t) => a + (b - a) * t;
-  const fract = (v) => v - Math.floor(v);
-  const fade = (t) => t * t * (3 - 2 * t);
-
-  const LOW0 = [11, 11, 10];
-  const LOW1 = [36, 24, 20];
-  const MID = [31, 143, 95];
-  const HIGH = [110, 23, 23];
-
-  function hash2(x, y) {
-    return fract(Math.sin(x * 127.1 + y * 311.7) * 43758.5453123);
-  }
-
-  function valueNoise(x, y) {
-    const xi = Math.floor(x);
-    const yi = Math.floor(y);
-    const xf = x - xi;
-    const yf = y - yi;
-
-    const n00 = hash2(xi, yi);
-    const n10 = hash2(xi + 1, yi);
-    const n01 = hash2(xi, yi + 1);
-    const n11 = hash2(xi + 1, yi + 1);
-
-    const u = fade(xf);
-    const v = fade(yf);
-
-    return lerp(lerp(n00, n10, u), lerp(n01, n11, u), v);
-  }
-
-  function fbm(x, y) {
-    let total = 0;
-    let amp = 0.58;
-    let freq = 1;
-    let norm = 0;
-    for (let i = 0; i < 4; i++) {
-      total += valueNoise(x * freq, y * freq) * amp;
-      norm += amp;
-      amp *= 0.5;
-      freq *= 2.03;
-    }
-    return total / norm;
-  }
-
-  function colorFor(v) {
-    let c0;
-    let c1;
-    let t;
-    if (v < 0.36) {
-      c0 = LOW0;
-      c1 = LOW1;
-      t = v / 0.36;
-    } else if (v < 0.72) {
-      c0 = LOW1;
-      c1 = MID;
-      t = (v - 0.36) / 0.36;
-    } else {
-      c0 = MID;
-      c1 = HIGH;
-      t = (v - 0.72) / 0.28;
-    }
-    return [
-      Math.round(lerp(c0[0], c1[0], t)),
-      Math.round(lerp(c0[1], c1[1], t)),
-      Math.round(lerp(c0[2], c1[2], t)),
-    ];
-  }
-
-  function resize() {
-    dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-    width = window.innerWidth;
-    height = window.innerHeight;
-    bgCanvas.width = Math.floor(width * dpr);
-    bgCanvas.height = Math.floor(height * dpr);
-    bgCanvas.style.width = `${width}px`;
-    bgCanvas.style.height = `${height}px`;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  }
-
-  function draw(time) {
-    bgState.offsetX += (bgState.targetOffsetX - bgState.offsetX) * 0.06;
-    bgState.offsetY += (bgState.targetOffsetY - bgState.offsetY) * 0.06;
-    bgState.scrollValue += (bgState.scrollTarget - bgState.scrollValue) * 0.06;
-
-    const step = 14;
-    for (let y = 0; y < height; y += step) {
-      for (let x = 0; x < width; x += step) {
-        const nx = x / width;
-        const ny = y / height;
-        const n = fbm(
-          nx * 4 + bgState.offsetX + time * 0.00011 + bgState.scrollValue * 0.8,
-          ny * 4 + bgState.offsetY - time * 0.00009 - bgState.scrollValue * 0.6
-        );
-        const c = colorFor(n);
-        ctx.fillStyle = `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
-        ctx.fillRect(x, y, step, step);
-      }
-    }
-    requestAnimationFrame(draw);
-  }
-
+function initInput() {
   window.addEventListener("mousemove", (event) => {
-    bgState.mouseX = event.clientX / Math.max(1, width);
-    bgState.mouseY = event.clientY / Math.max(1, height);
-    bgState.targetOffsetX = (bgState.mouseX - 0.5) * 0.55;
-    bgState.targetOffsetY = (bgState.mouseY - 0.5) * 0.55;
+    renderState.mouseX = event.clientX;
+    renderState.mouseY = event.clientY;
+    titleEl.style.setProperty("--tx", `${(event.clientX / window.innerWidth - 0.5) * 6}px`);
+    titleEl.style.setProperty("--ty", `${(event.clientY / window.innerHeight - 0.5) * 4}px`);
   });
 
   window.addEventListener("scroll", () => {
     const max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
-    bgState.scrollTarget = Math.min(1, window.scrollY / max);
+    renderState.scrollTarget = Math.min(1, window.scrollY / max);
   }, { passive: true });
+}
 
-  resize();
-  requestAnimationFrame(draw);
-  window.addEventListener("resize", resize);
+function ensureBoardRect() {
+  renderState.boardRect = boardEl.getBoundingClientRect();
+  const arenaRect = arenaEl.getBoundingClientRect();
+  const w = arenaRect.width;
+  const h = arenaRect.height;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  fxBoardCanvas.width = Math.max(1, Math.floor(w * dpr));
+  fxBoardCanvas.height = Math.max(1, Math.floor(h * dpr));
+  fxBoardCanvas.style.width = `${w}px`;
+  fxBoardCanvas.style.height = `${h}px`;
+}
+
+function initFireBuffer(width, height) {
+  const fw = Math.max(80, Math.floor(width / 4));
+  const fh = Math.max(60, Math.floor(height / 4));
+  const a = new Uint8Array(fw * fh);
+  const b = new Uint8Array(fw * fh);
+  for (let x = 0; x < fw; x++) a[(fh - 1) * fw + x] = 36;
+  const fireCanvas = document.createElement("canvas");
+  fireCanvas.width = fw;
+  fireCanvas.height = fh;
+  const fireCtx = fireCanvas.getContext("2d");
+  if (!fireCtx) return null;
+  return {
+    fw,
+    fh,
+    a,
+    b,
+    fireCanvas,
+    fireCtx,
+    img: fireCtx.createImageData(fw, fh),
+  };
+}
+
+function updateFire(dt) {
+  if (!renderState.fire) {
+    renderState.fire = initFireBuffer(bgCanvas.width / (window.devicePixelRatio || 1), bgCanvas.height / (window.devicePixelRatio || 1));
+    if (!renderState.fire) return;
+  }
+  const fire = renderState.fire;
+  const { fw, fh, a, b } = fire;
+  b.fill(0);
+  const fuel = 34 + Math.floor((1 - renderState.scrollSmooth) * 2);
+  for (let x = 0; x < fw; x++) a[(fh - 1) * fw + x] = fuel;
+
+  for (let y = 1; y < fh; y++) {
+    const row = y * fw;
+    const above = (y - 1) * fw;
+    for (let x = 0; x < fw; x++) {
+      const decay = (Math.random() * 4) | 0;
+      const nx = clamp(x + ((Math.random() * 3) | 0) - 1, 0, fw - 1);
+      const val = a[row + x] - decay;
+      b[above + nx] = val > 0 ? val : 0;
+    }
+  }
+  fire.a = b;
+  fire.b = a;
+}
+
+function renderBackground(ctx, width, height, time) {
+  if (!renderState.fire) return;
+  const fire = renderState.fire;
+  const { fw, fh, a, fireCtx, img, fireCanvas } = fire;
+  const data = img.data;
+  for (let i = 0; i < a.length; i++) {
+    const color = FIRE_PALETTE[a[i]];
+    const p = i * 4;
+    data[p] = color[0];
+    data[p + 1] = color[1];
+    data[p + 2] = color[2];
+    data[p + 3] = 255;
+  }
+  fireCtx.putImageData(img, 0, 0);
+
+  ctx.clearRect(0, 0, width, height);
+  const stripe = 4;
+  const amp = 4 + renderState.scrollSmooth * 6;
+  for (let y = 0; y < height; y += stripe) {
+    const srcY = Math.floor((y / height) * fh);
+    const offsetX = Math.sin(y * 0.018 + time * 0.003) * amp + Math.cos(y * 0.011 + time * 0.0023) * (amp * 0.35);
+    ctx.drawImage(fireCanvas, 0, srcY, fw, 1, offsetX, y, width, stripe + 1);
+  }
+}
+
+function initParticles(width, height) {
+  const count = Math.max(90, Math.min(220, Math.floor((width * height) / 9000)));
+  renderState.particles = Array.from({ length: count }, () => ({
+    x: Math.random() * width,
+    y: Math.random() * height,
+    vx: 0,
+    vy: 0,
+  }));
+}
+
+function noiseLike(x, y, t) {
+  return Math.sin(x * 0.012 + t * 0.0017) * 0.5 + Math.cos(y * 0.013 - t * 0.0014) * 0.5;
+}
+
+function updateParticles(width, height, time) {
+  if (!renderState.particles.length) initParticles(width, height);
+  const mx = renderState.mouseX;
+  const my = renderState.mouseY;
+
+  for (const p of renderState.particles) {
+    const angle = noiseLike(p.x * 0.17, p.y * 0.17, time) * Math.PI * 2;
+    p.vx += Math.cos(angle) * 0.06;
+    p.vy += Math.sin(angle) * 0.06;
+
+    const dx = mx - p.x;
+    const dy = my - p.y;
+    const d = Math.hypot(dx, dy) + 0.001;
+    const force = Math.max(0, 1 - d / 260) * 0.22;
+    p.vx += (dx / d) * force;
+    p.vy += (dy / d) * force;
+
+    const speed = Math.hypot(p.vx, p.vy);
+    if (speed > 1.6) {
+      p.vx = (p.vx / speed) * 1.6;
+      p.vy = (p.vy / speed) * 1.6;
+    }
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vx *= 0.96;
+    p.vy *= 0.96;
+
+    if (p.x < 0) p.x += width;
+    if (p.x > width) p.x -= width;
+    if (p.y < 0) p.y += height;
+    if (p.y > height) p.y -= height;
+  }
+}
+
+function renderParticles(ctx) {
+  for (const p of renderState.particles) {
+    ctx.fillStyle = "rgba(184,164,140,0.16)";
+    ctx.fillRect(p.x, p.y, 2, 2);
+  }
+}
+
+function renderDither(ctx, width, height, time) {
+  const threshold = ((Math.sin(time * 0.0015) + 1) * 0.5) * 15;
+  const step = 4;
+  for (let y = 0; y < height; y += step) {
+    for (let x = 0; x < width; x += step) {
+      const m = BAYER_4X4[(y / step) % 4][(x / step) % 4];
+      if (m < threshold && Math.random() < 0.32) {
+        ctx.fillStyle = "rgba(0,0,0,0.05)";
+        ctx.fillRect(x, y, 1, 1);
+      }
+    }
+  }
+}
+
+function updateCellLighting() {
+  if (!cellRefs.length) return;
+  const mx = renderState.mouseX;
+  const my = renderState.mouseY;
+  const radius = 260;
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      const el = cellRefs[r][c];
+      if (!el) continue;
+      const rect = el.getBoundingClientRect();
+      const cx = rect.left + rect.width * 0.5;
+      const cy = rect.top + rect.height * 0.5;
+      const d = Math.hypot(mx - cx, my - cy);
+      const intensity = clamp(1 - d / radius, 0, 1);
+      el.style.setProperty("--ray", intensity.toFixed(3));
+    }
+  }
+}
+
+function addTrailForMove(move) {
+  const from = cellCenter(move.from[0], move.from[1]);
+  const to = cellCenter(move.to[0], move.to[1]);
+  const dr = to.y - from.y;
+  const dc = to.x - from.x;
+  const mid = Math.abs(dr) > Math.abs(dc)
+    ? { x: from.x, y: from.y + dr * 0.65 }
+    : { x: from.x + dc * 0.65, y: from.y };
+  renderState.trails.push({
+    points: [from, mid, to],
+    life: 1,
+    color: state.turn === U ? "rgba(213,155,69," : "rgba(105,212,154,",
+  });
+  if (renderState.trails.length > 12) renderState.trails.shift();
+}
+
+function drawKnightOverlay(fxCtx, rect) {
+  const origin = state.selected || state.hoverCell;
+  if (!origin) return;
+  const [r, c] = origin;
+  const o = cellCenter(r, c);
+  const ox = o.x - rect.left;
+  const oy = o.y - rect.top;
+
+  fxCtx.strokeStyle = "rgba(184,164,140,0.18)";
+  fxCtx.lineWidth = 1.1;
+  fxCtx.beginPath();
+  for (const [dr, dc] of DELTAS) {
+    const nr = r + dr;
+    const nc = c + dc;
+    if (!inBounds(nr, nc)) continue;
+    const t = cellCenter(nr, nc);
+    fxCtx.moveTo(ox, oy);
+    fxCtx.lineTo(t.x - rect.left, t.y - rect.top);
+  }
+  fxCtx.stroke();
+}
+
+function drawTrailsAndAnim() {
+  const fxCtx = fxBoardCanvas.getContext("2d");
+  if (!fxCtx || !renderState.boardRect) return;
+  const rect = arenaEl.getBoundingClientRect();
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  fxCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  fxCtx.clearRect(0, 0, rect.width, rect.height);
+
+  drawKnightOverlay(fxCtx, rect);
+
+  for (const trail of renderState.trails) {
+    fxCtx.lineWidth = 2.2;
+    fxCtx.strokeStyle = `${trail.color}${trail.life.toFixed(3)})`;
+    fxCtx.beginPath();
+    trail.points.forEach((p, i) => {
+      const x = p.x - rect.left;
+      const y = p.y - rect.top;
+      if (i === 0) fxCtx.moveTo(x, y);
+      else fxCtx.lineTo(x, y);
+    });
+    fxCtx.stroke();
+    trail.life -= 0.03;
+  }
+  renderState.trails = renderState.trails.filter((t) => t.life > 0);
+
+  if (state.animMove) {
+    const a = state.animMove;
+    const x = a.x - rect.left;
+    const y = a.y - rect.top;
+    fxCtx.font = "26px serif";
+    fxCtx.textAlign = "center";
+    fxCtx.textBaseline = "middle";
+    fxCtx.fillStyle = a.piece === U ? "rgba(213,155,69,0.96)" : "rgba(105,212,154,0.96)";
+    fxCtx.fillText(a.piece === U ? "🦄" : "🐴", x, y);
+  }
+}
+
+function updateAnimation() {
+  if (!state.animMove) return;
+  const a = state.animMove;
+  a.x += (a.tx - a.x) * 0.2;
+  a.y += (a.ty - a.y) * 0.2;
+  const done = Math.hypot(a.tx - a.x, a.ty - a.y) < 1.4;
+  if (!done) return;
+  const move = { from: [...a.from], to: [...a.to] };
+  const fromBot = state.animFromBot;
+  state.animMove = null;
+  state.animFromBot = false;
+  finalizeMove(move, fromBot);
+}
+
+function finalizeMove(move, fromBot) {
+  state.board = applyMove(state.board, move);
+  state.history.push({ type: "move", player: state.turn, move });
+  state.selected = null;
+  state.validTargets = [];
+  state.info = fromBot ? "Jogada do bot concluída." : "";
+  addTrailForMove(move);
+
+  const result = checkWin(state.board, state.turn);
+  if (result.won) {
+    state.gameOver = true;
+    state.winner = state.turn;
+    state.winningCells = result.coords;
+    render();
+    return;
+  }
+  state.turn = other(state.turn);
+  applyPassLogic();
+  render();
+  scheduleBotTurn();
+}
+
+function loop(now) {
+  const dt = Math.min(40, now - lastTime);
+  lastTime = now;
+  renderState.noiseT += dt * 0.001;
+  renderState.waveT += dt * 0.0012;
+  renderState.scrollSmooth += (renderState.scrollTarget - renderState.scrollSmooth) * 0.06;
+  renderState.flicker = 0.105 + Math.sin(now * 0.026) * 0.02;
+  crtEl.style.opacity = renderState.flicker.toFixed(3);
+
+  const bgCtx = bgCanvas.getContext("2d");
+  if (bgCtx) {
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    if (bgCanvas.width !== Math.floor(w * dpr) || bgCanvas.height !== Math.floor(h * dpr)) {
+      bgCanvas.width = Math.floor(w * dpr);
+      bgCanvas.height = Math.floor(h * dpr);
+      bgCanvas.style.width = `${w}px`;
+      bgCanvas.style.height = `${h}px`;
+      bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      renderState.fire = initFireBuffer(w, h);
+      initParticles(w, h);
+      ensureBoardRect();
+    }
+
+    updateFire(dt);
+    renderBackground(bgCtx, w, h, now);
+    updateParticles(w, h, now);
+    renderParticles(bgCtx);
+    renderDither(bgCtx, w, h, now);
+  }
+
+  updateAnimation();
+  updateCellLighting();
+  ensureBoardRect();
+  drawTrailsAndAnim();
+
+  requestAnimationFrame(loop);
 }
 
 newGameBtn.addEventListener("click", startGame);
 modeEl.addEventListener("change", startGame);
 undoBtn.addEventListener("click", () => {
-  if (state.undoUsed || !state.snapshotBeforeMove) return;
+  if (state.undoUsed || !state.snapshotBeforeMove || state.animMove) return;
   clearBotTimer();
   restoreSnapshot(state.snapshotBeforeMove);
   state.snapshotBeforeMove = null;
@@ -669,5 +950,7 @@ undoBtn.addEventListener("click", () => {
   scheduleBotTurn();
 });
 
-initBackground();
+window.addEventListener("resize", ensureBoardRect);
+initInput();
 startGame();
+requestAnimationFrame(loop);
